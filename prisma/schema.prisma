@@ -8,7 +8,7 @@ datasource db {
 }
 
 // ============================================
-// MODELOS BASE BETTER AUTH
+// MODELOS BASE BETTER AUTH (SIN MODIFICAR)
 // ============================================
 
 model User {
@@ -22,29 +22,32 @@ model User {
   createdAt     DateTime
   updatedAt     DateTime
   
-  // Extensiones para administración
   banned        Boolean?  @default(false)
   banReason     String?
   banExpires    DateTime?
-
   
   role          String    @default("USER")
   status        String    @default("ACTIVE")
   departmentId  String?
-  managerId     String?      // Auto-referencia para jerarquía
+  managerId     String?
   
-  // Relaciones Better Auth
   sessions      Session[]
   accounts      Account[]
   
-  // Relaciones organizacionales
   department    Department?        @relation("UserDepartment", fields: [departmentId], references: [id], onDelete: SetNull)
   manager       User?              @relation("ManagerSubordinates", fields: [managerId], references: [id], onDelete: SetNull)
   subordinates  User[]             @relation("ManagerSubordinates")
   
-  // Relaciones con organizaciones
   organizationMembers OrganizationMember[]
   organizationInvitations OrganizationInvitation[]
+
+  // Relaciones con el CRM
+  clientesRegistrados     Cliente[]              @relation("ClienteRegistradoPor")
+  comisionesGeneradas     ComisionVenta[]        @relation("ComisionUsuario")
+  tramitesAsignados       Tramite[]              @relation("TramiteUsuarioAsignado")
+  aprobacionesSolicitadas Aprobacion[]           @relation("AprobacionSolicitante")
+  aprobacionesRevisadas   Aprobacion[]           @relation("AprobacionAprobador")
+  citasCreadas            Cita[]                 @relation("CitaCreadaPor")
 
   @@unique([email])
   @@index([departmentId])
@@ -52,6 +55,7 @@ model User {
   @@index([role])
   @@index([status])
   @@map("user")
+  tramiteHistorials TramiteHistorial[] @relation("AprobacionSolicitante")
 }
 
 model Session {
@@ -98,10 +102,6 @@ model Verification {
 
   @@map("verification")
 }
-
-// ============================================
-// MODELOS DE ORGANIZACIÓN (Organization Plugin)
-// ============================================
 
 model Organization {
   id        String   @id
@@ -155,10 +155,6 @@ model OrganizationInvitation {
   @@map("organization_invitation")
 }
 
-// ============================================
-// MODELOS PERSONALIZADOS
-// ============================================
-
 model Department {
   id          String   @id @default(cuid())
   name        String
@@ -176,8 +172,620 @@ model Department {
 }
 
 // ============================================
+// CATÁLOGOS BASE
+// ============================================
+
+/// Departamentos de Bolivia (9 regiones)
+model Region {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  codigo      String   @unique
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  serviciosPrecios ServicioPrecioPorRegion[]
+  citasPrecios     CitaPrecioPorRegion[]
+  clientes         Cliente[]
+
+  @@index([activo])
+  @@map("region")
+}
+
+/// Tipos de servicios (visa turista, visa estudiante, etc.)
+model CatalogoServicio {
+  id              String   @id @default(cuid())
+  nombre          String   @unique
+  descripcion     String?
+  codigo          String   @unique
+  requiereTramite Boolean  @default(true)
+  activo          Boolean  @default(true)
+  orden           Int      @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  preciosPorRegion ServicioPrecioPorRegion[]
+  clientesServicios ClienteServicio[]
+
+  @@index([activo])
+  @@index([orden])
+  @@map("catalogo_servicio")
+}
+
+/// Precios de servicios por región
+model ServicioPrecioPorRegion {
+  id         String   @id @default(cuid())
+  servicioId String
+  regionId   String
+  precio     Decimal  @db.Decimal(10, 2)
+  activo     Boolean  @default(true)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  servicio CatalogoServicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+  region   Region           @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@unique([servicioId, regionId])
+  @@index([servicioId])
+  @@index([regionId])
+  @@index([activo])
+  @@map("servicio_precio_por_region")
+}
+
+/// Tipos de citas (simulacro, entrevista consular, etc.)
+model CatalogoTipoCita {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  descripcion String?
+  codigo      String   @unique
+  activo      Boolean  @default(true)
+  orden       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  preciosPorRegion CitaPrecioPorRegion[]
+  citas            Cita[]
+
+  @@index([activo])
+  @@index([orden])
+  @@map("catalogo_tipo_cita")
+}
+
+/// Precios de citas por región
+model CitaPrecioPorRegion {
+  id          String   @id @default(cuid())
+  tipoCitaId  String
+  regionId    String
+  precio      Decimal  @db.Decimal(10, 2)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tipoCita CatalogoTipoCita @relation(fields: [tipoCitaId], references: [id], onDelete: Cascade)
+  region   Region           @relation(fields: [regionId], references: [id], onDelete: Cascade)
+
+  @@unique([tipoCitaId, regionId])
+  @@index([tipoCitaId])
+  @@index([regionId])
+  @@index([activo])
+  @@map("cita_precio_por_region")
+}
+
+/// Estados del trámite (iniciado, en proceso, completado, etc.)
+model CatalogoEstadoTramite {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  descripcion String?
+  codigo      String   @unique
+  color       String?
+  orden       Int      @default(0)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  tramites         Tramite[]
+  tramiteHistorial TramiteHistorial[]
+
+  @@index([activo])
+  @@index([orden])
+  @@map("catalogo_estado_tramite")
+}
+
+/// Estados de pago (pendiente, pagado parcial, pagado completo)
+model CatalogoEstadoPago {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  descripcion String?
+  codigo      String   @unique
+  color       String?
+  orden       Int      @default(0)
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clientesServicios ClienteServicio[]
+  citas             Cita[]
+
+  @@index([activo])
+  @@index([orden])
+  @@map("catalogo_estado_pago")
+}
+
+/// Tipos de parentesco para grupos familiares
+model CatalogoParentesco {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  descripcion String?
+  codigo      String   @unique
+  activo      Boolean  @default(true)
+  orden       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  miembrosFamiliares GrupoFamiliarMiembro[]
+
+  @@index([activo])
+  @@index([orden])
+  @@map("catalogo_parentesco")
+}
+
+/// Tipos de aprobación (descuento, cambio de precio, cancelación)
+model CatalogoTipoAprobacion {
+  id          String   @id @default(cuid())
+  nombre      String   @unique
+  descripcion String?
+  codigo      String   @unique
+  activo      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  aprobaciones Aprobacion[]
+
+  @@index([activo])
+  @@map("catalogo_tipo_aprobacion")
+}
+
+// ============================================
+// CLIENTES
+// ============================================
+
+/// Cliente base (datos mínimos, soporta adultos e infantes)
+model Cliente {
+  id                String    @id @default(cuid())
+  nombres           String
+  apellidos         String
+  tipoCliente       TipoCliente @default(ADULTO)
+  fechaNacimiento   DateTime?
+  lugarNacimiento   String?
+  nacionalidad      String?
+  numeroCi          String?   @unique
+  numeroPasaporte   String?   @unique
+  email             String?
+  telefonoCelular   String?
+  regionId          String
+  registradoPorId   String
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  region              Region                    @relation(fields: [regionId], references: [id], onDelete: Restrict)
+  registradoPor       User                      @relation("ClienteRegistradoPor", fields: [registradoPorId], references: [id], onDelete: Restrict)
+  
+  datosPersonales     ClienteDatosPersonales?
+  datosLaborales      ClienteDatosLaborales?
+  datosAcademicos     ClienteDatosAcademicos?
+  datosMatrimoniales  ClienteDatosMatrimoniales?
+  datosPatrocinador   ClienteDatosPatrocinador?
+  
+  servicios           ClienteServicio[]
+  tramites            Tramite[]
+  gruposFamiliares    GrupoFamiliarMiembro[]
+  comisiones          ComisionVenta[]
+
+  @@index([regionId])
+  @@index([registradoPorId])
+  @@index([tipoCliente])
+  @@index([activo])
+  @@index([deletedAt])
+  @@map("cliente")
+}
+
+/// Datos personales adicionales (solo para adultos)
+model ClienteDatosPersonales {
+  id                      String    @id @default(cuid())
+  clienteId               String    @unique
+  pasaporteFechaEmision   DateTime?
+  pasaporteFechaExpiracion DateTime?
+  facebook                String?
+  instagram               String?
+  direccionDomicilio      String?
+  estadoCivil             String?
+  profesion               String?
+  nombrePadre             String?
+  fechaNacimientoPadre    DateTime?
+  nombreMadre             String?
+  fechaNacimientoMadre    DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@map("cliente_datos_personales")
+}
+
+/// Datos laborales (solo para adultos)
+model ClienteDatosLaborales {
+  id                        String    @id @default(cuid())
+  clienteId                 String    @unique
+  lugarTrabajo              String?
+  cargoTrabajo              String?
+  descripcionTrabajo        String?
+  direccionTrabajo          String?
+  telefonoTrabajo           String?
+  fechaContratacion         DateTime?
+  percepcionSalarial        Decimal?  @db.Decimal(10, 2)
+  
+  nombreTrabajoAnterior     String?
+  telefonoTrabajoAnterior   String?
+  direccionTrabajoAnterior  String?
+  fechaInicioTrabajoAnterior DateTime?
+  referenciaTrabajoAnterior String?
+  
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@map("cliente_datos_laborales")
+}
+
+/// Datos académicos (solo para adultos)
+model ClienteDatosAcademicos {
+  id                String    @id @default(cuid())
+  clienteId         String    @unique
+  lugarEstudio      String?
+  carreraEstudio    String?
+  direccionEstudio  String?
+  telefonoEstudio   String?
+  fechaInicioEstudio DateTime?
+  fechaFinEstudio   DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@map("cliente_datos_academicos")
+}
+
+/// Datos matrimoniales (solo para adultos casados)
+model ClienteDatosMatrimoniales {
+  id                      String    @id @default(cuid())
+  clienteId               String    @unique
+  conyugeNombreCompleto   String?
+  conyugeFechaNacimiento  DateTime?
+  conyugeLugarNacimiento  String?
+  matrimonioFechaInicio   DateTime?
+  matrimonioFechaFin      DateTime?
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@map("cliente_datos_matrimoniales")
+}
+
+/// Datos del patrocinador (si aplica)
+model ClienteDatosPatrocinador {
+  id                              String    @id @default(cuid())
+  clienteId                       String    @unique
+  nombrePatrocinador              String?
+  direccionPatrocinador           String?
+  telefonoPatrocinador            String?
+  emailPatrocinador               String?
+  trabajoPatrocinador             String?
+  fechaInicioTrabajoPatrocinador  DateTime?
+  percepcionSalarialPatrocinador  Decimal?  @db.Decimal(10, 2)
+  createdAt                       DateTime  @default(now())
+  updatedAt                       DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@map("cliente_datos_patrocinador")
+}
+
+// ============================================
+// SERVICIOS CONTRATADOS
+// ============================================
+
+/// Servicios contratados por el cliente
+model ClienteServicio {
+  id                String    @id @default(cuid())
+  clienteId         String
+  servicioId        String
+  precioAcordado    Decimal   @db.Decimal(10, 2)
+  descuentoAplicado Decimal?  @db.Decimal(10, 2)
+  precioFinal       Decimal   @db.Decimal(10, 2)
+  estadoPagoId      String
+  notas             String?
+  aprobacionId      String?   @unique
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  cliente     Cliente              @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  servicio    CatalogoServicio     @relation(fields: [servicioId], references: [id], onDelete: Restrict)
+  estadoPago  CatalogoEstadoPago   @relation(fields: [estadoPagoId], references: [id], onDelete: Restrict)
+  aprobacion  Aprobacion?          @relation(fields: [aprobacionId], references: [id], onDelete: SetNull)
+
+  tramites    Tramite[]
+
+  @@index([clienteId])
+  @@index([servicioId])
+  @@index([estadoPagoId])
+  @@index([deletedAt])
+  @@map("cliente_servicio")
+}
+
+// ============================================
+// GRUPOS FAMILIARES
+// ============================================
+
+/// Grupos familiares para agrupar clientes relacionados
+model GrupoFamiliar {
+  id                String    @id @default(cuid())
+  nombre            String
+  descripcion       String?
+  activo            Boolean   @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  miembros          GrupoFamiliarMiembro[]
+  citasGrupales     Cita[]
+
+  @@index([activo])
+  @@index([deletedAt])
+  @@map("grupo_familiar")
+}
+
+/// Miembros de un grupo familiar
+model GrupoFamiliarMiembro {
+  id              String    @id @default(cuid())
+  grupoFamiliarId String
+  clienteId       String
+  parentescoId    String
+  esTitular       Boolean   @default(false)
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  grupoFamiliar GrupoFamiliar     @relation(fields: [grupoFamiliarId], references: [id], onDelete: Cascade)
+  cliente       Cliente           @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  parentesco    CatalogoParentesco @relation(fields: [parentescoId], references: [id], onDelete: Restrict)
+
+  @@unique([grupoFamiliarId, clienteId])
+  @@index([grupoFamiliarId])
+  @@index([clienteId])
+  @@index([parentescoId])
+  @@map("grupo_familiar_miembro")
+}
+
+// ============================================
+// TRÁMITES
+// ============================================
+
+/// Trámite de visa
+model Tramite {
+  id                        String    @id @default(cuid())
+  clienteId                 String
+  clienteServicioId         String
+  usuarioAsignadoId         String?
+  estadoActualId            String
+  codigoConfirmacionDs160   String?
+  codigoSeguimientoCourier  String?
+  visaNumero                String?
+  visaFechaEmision          DateTime?
+  visaFechaExpiracion       DateTime?
+  notas                     String?
+  createdAt                 DateTime  @default(now())
+  updatedAt                 DateTime  @updatedAt
+  deletedAt                 DateTime?
+
+  cliente         Cliente                 @relation(fields: [clienteId], references: [id], onDelete: Restrict)
+  clienteServicio ClienteServicio         @relation(fields: [clienteServicioId], references: [id], onDelete: Restrict)
+  usuarioAsignado User?                   @relation("TramiteUsuarioAsignado", fields: [usuarioAsignadoId], references: [id], onDelete: SetNull)
+  estadoActual    CatalogoEstadoTramite   @relation(fields: [estadoActualId], references: [id], onDelete: Restrict)
+
+  historial       TramiteHistorial[]
+  citas           Cita[]
+
+  @@index([clienteId])
+  @@index([clienteServicioId])
+  @@index([usuarioAsignadoId])
+  @@index([estadoActualId])
+  @@index([deletedAt])
+  @@map("tramite")
+  citaParticipantes CitaParticipante[]
+}
+
+/// Historial de cambios de estado del trámite
+model TramiteHistorial {
+  id          String    @id @default(cuid())
+  tramiteId   String
+  estadoId    String
+  usuarioId   String?
+  observacion String?
+  createdAt   DateTime  @default(now())
+
+  tramite Tramite               @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+  estado  CatalogoEstadoTramite @relation(fields: [estadoId], references: [id], onDelete: Restrict)
+  usuario User?                 @relation("AprobacionSolicitante", fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  @@index([tramiteId])
+  @@index([estadoId])
+  @@index([usuarioId])
+  @@index([createdAt])
+  @@map("tramite_historial")
+}
+
+// ============================================
+// CITAS
+// ============================================
+
+/// Citas (individuales o grupales familiares)
+model Cita {
+  id                String    @id @default(cuid())
+  tramiteId         String?
+  grupoFamiliarId   String?
+  tipoCitaId        String
+  fechaHora         DateTime
+  lugar             String?
+  precioAcordado    Decimal   @db.Decimal(10, 2)
+  descuentoAplicado Decimal?  @db.Decimal(10, 2)
+  precioFinal       Decimal   @db.Decimal(10, 2)
+  estadoPagoId      String
+  estado            EstadoCita @default(PROGRAMADA)
+  notas             String?
+  creadaPorId       String
+  aprobacionId      String?   @unique
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  deletedAt         DateTime?
+
+  tramite        Tramite?              @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+  grupoFamiliar  GrupoFamiliar?        @relation(fields: [grupoFamiliarId], references: [id], onDelete: Cascade)
+  tipoCita       CatalogoTipoCita      @relation(fields: [tipoCitaId], references: [id], onDelete: Restrict)
+  estadoPago     CatalogoEstadoPago    @relation(fields: [estadoPagoId], references: [id], onDelete: Restrict)
+  creadaPor      User                  @relation("CitaCreadaPor", fields: [creadaPorId], references: [id], onDelete: Restrict)
+  aprobacion     Aprobacion?           @relation(fields: [aprobacionId], references: [id], onDelete: SetNull)
+
+  participantes  CitaParticipante[]
+
+  @@index([tramiteId])
+  @@index([grupoFamiliarId])
+  @@index([tipoCitaId])
+  @@index([estadoPagoId])
+  @@index([estado])
+  @@index([creadaPorId])
+  @@index([fechaHora])
+  @@index([deletedAt])
+  @@map("cita")
+}
+
+/// Participantes de una cita (para citas grupales)
+model CitaParticipante {
+  id        String    @id @default(cuid())
+  citaId    String
+  tramiteId String
+  asistio   Boolean   @default(false)
+  notas     String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  cita    Cita    @relation(fields: [citaId], references: [id], onDelete: Cascade)
+  tramite Tramite @relation(fields: [tramiteId], references: [id], onDelete: Cascade)
+
+  @@unique([citaId, tramiteId])
+  @@index([citaId])
+  @@index([tramiteId])
+  @@map("cita_participante")
+}
+
+// ============================================
+// COMISIONES
+// ============================================
+
+/// Comisiones por registro de clientes
+model ComisionVenta {
+  id             String    @id @default(cuid())
+  clienteId      String
+  usuarioId      String
+  montoComision  Decimal   @db.Decimal(10, 2)
+  estado         EstadoComision @default(PENDIENTE)
+  fechaPago      DateTime?
+  notas          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+  usuario User    @relation("ComisionUsuario", fields: [usuarioId], references: [id], onDelete: Restrict)
+
+  @@index([clienteId])
+  @@index([usuarioId])
+  @@index([estado])
+  @@index([fechaPago])
+  @@map("comision_venta")
+}
+
+// ============================================
+// WORKFLOW DE APROBACIONES
+// ============================================
+
+/// Aprobaciones para descuentos, cambios de precio, etc.
+model Aprobacion {
+  id                String    @id @default(cuid())
+  tipoAprobacionId  String
+  solicitanteId     String
+  aprobadorId       String?
+  estado            EstadoAprobacion @default(PENDIENTE)
+  montoOriginal     Decimal   @db.Decimal(10, 2)
+  montoSolicitado   Decimal   @db.Decimal(10, 2)
+  justificacion     String
+  respuesta         String?
+  fechaSolicitud    DateTime  @default(now())
+  fechaRespuesta    DateTime?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  tipoAprobacion CatalogoTipoAprobacion @relation(fields: [tipoAprobacionId], references: [id], onDelete: Restrict)
+  solicitante    User                   @relation("AprobacionSolicitante", fields: [solicitanteId], references: [id], onDelete: Restrict)
+  aprobador      User?                  @relation("AprobacionAprobador", fields: [aprobadorId], references: [id], onDelete: SetNull)
+
+  clienteServicio ClienteServicio?
+  cita            Cita?
+
+  @@index([tipoAprobacionId])
+  @@index([solicitanteId])
+  @@index([aprobadorId])
+  @@index([estado])
+  @@index([fechaSolicitud])
+  @@map("aprobacion")
+}
+
+// ============================================
 // ENUMS
 // ============================================
+
+enum TipoCliente {
+  ADULTO
+  INFANTE
+}
+
+enum EstadoCita {
+  PROGRAMADA
+  COMPLETADA
+  CANCELADA
+  REPROGRAMADA
+}
+
+enum EstadoComision {
+  PENDIENTE
+  APROBADA
+  PAGADA
+  CANCELADA
+}
+
+enum EstadoAprobacion {
+  PENDIENTE
+  APROBADA
+  RECHAZADA
+  CANCELADA
+}
 
 enum UserRole {
   SUPER_ADMIN

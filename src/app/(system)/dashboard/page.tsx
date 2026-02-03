@@ -4,9 +4,6 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { SettingsContainer } from "@/components/system/settings/settings-container";
 import { auth } from "@/lib/auth";
-import { db } from "@/lib/db";
-
-const ALLOWED_ROLES = ["SUPER_ADMIN", "ADMIN"] as const;
 
 export default async function SettingsPage() {
   const session = await auth.api.getSession({
@@ -17,17 +14,5 @@ export default async function SettingsPage() {
     redirect("/sign-in");
   }
 
-  const user = await db.user.findUnique({
-    where: { id: session.user.id },
-    select: { role: true },
-  });
-
-  if (
-    !user ||
-    !ALLOWED_ROLES.includes(user.role as (typeof ALLOWED_ROLES)[number])
-  ) {
-    redirect("/dashboard");
-  }
-
-  return <SettingsContainer />;
+  return <div>En desarrollo</div>;
 }

@@ -21,8 +21,8 @@ const audiowide = Audiowide({
 });
 
 export const metadata: Metadata = {
-  title: "Alpaca - Next.js Boilerplate",
-  description: "A Next.js boilerplate with TypeScript, Tailwind CSS, and more.",
+  title: "GOUSA - CRM",
+  description: "V2 of GOUSA CRM application",
 };
 
 export default function RootLayout({
