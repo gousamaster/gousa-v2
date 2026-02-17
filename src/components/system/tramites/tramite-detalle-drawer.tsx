@@ -9,6 +9,7 @@ import { ChevronDown, Loader2, Save } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Controller, useForm } from "react-hook-form";
 import { toast } from "sonner";
+import { TramiteCitasSection } from "@/components/system/citas/tramite-citas-section";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -125,6 +126,11 @@ export function TramiteDetalleDrawer({
             />
             <Separator />
             <HistorialTramite tramite={tramite} />
+            <Separator />
+            <TramiteCitasSection
+              tramiteId={tramite.id}
+              regionId={tramite.cliente.regionId}
+            />
           </div>
         )}
       </SheetContent>

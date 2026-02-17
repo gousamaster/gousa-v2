@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { ClienteCitasTab } from "@/components/system/citas/cliente-citas-tab";
 import { ClienteServiciosTab } from "@/components/system/tramites/cliente-servicios-tab";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { obtenerClientePorId } from "@/lib/actions/clientes/clientes-actions";
@@ -40,10 +41,15 @@ export default async function ClientePerfilPage({
       <Tabs defaultValue="servicios">
         <TabsList>
           <TabsTrigger value="servicios">Servicios y Trámites</TabsTrigger>
+          <TabsTrigger value="citas">Citas</TabsTrigger>
         </TabsList>
 
         <TabsContent value="servicios" className="mt-4">
           <ClienteServiciosTab cliente={cliente} />
+        </TabsContent>
+
+        <TabsContent value="citas" className="mt-4">
+          <ClienteCitasTab clienteId={cliente.id} />
         </TabsContent>
       </Tabs>
     </div>

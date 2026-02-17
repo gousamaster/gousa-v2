@@ -26,6 +26,7 @@ export type TramiteListItem = {
     id: string;
     nombres: string;
     apellidos: string;
+    regionId: string;
     regionNombre: string;
   };
   servicio: { nombre: string; codigo: string };
@@ -57,6 +58,7 @@ const tramiteSelect = {
       id: true,
       nombres: true,
       apellidos: true,
+      regionId: true,
       region: { select: { nombre: true } },
     },
   },
@@ -81,6 +83,7 @@ function mapTramite(raw: any): TramiteListItem {
       id: raw.cliente.id,
       nombres: raw.cliente.nombres,
       apellidos: raw.cliente.apellidos,
+      regionId: raw.cliente.regionId,
       regionNombre: raw.cliente.region.nombre,
     },
     servicio: raw.clienteServicio.servicio,

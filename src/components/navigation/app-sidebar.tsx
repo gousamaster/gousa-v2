@@ -2,7 +2,9 @@
 
 import {
   AppWindowIcon,
+  CalendarIcon,
   CommandIcon,
+  NotebookIcon,
   SettingsIcon,
   UsersIcon,
 } from "lucide-react";
@@ -33,9 +35,14 @@ const data = {
       icon: UsersIcon,
     },
     {
-      title: "Trámites  ",
+      title: "Trámites",
       url: "/tramites",
-      icon: UsersIcon,
+      icon: NotebookIcon,
+    },
+    {
+      title: "Citas",
+      url: "/citas",
+      icon: CalendarIcon,
     },
     {
       title: "Usuarios",
