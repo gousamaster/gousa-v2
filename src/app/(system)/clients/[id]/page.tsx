@@ -9,7 +9,7 @@ import { obtenerClientePorId } from "@/lib/actions/clientes/clientes-actions";
 import { auth } from "@/lib/auth";
 
 interface ClientePerfilPageProps {
-  params: Promise<{ id: string }>;
+  params: { id: string };
 }
 
 export default async function ClientePerfilPage({
@@ -19,7 +19,7 @@ export default async function ClientePerfilPage({
 
   if (!session?.user) redirect("/sign-in");
 
-  const { id } = await params;
+  const { id } = params;
   const result = await obtenerClientePorId(id);
 
   if (!result.success || !result.data) redirect("/clients");
