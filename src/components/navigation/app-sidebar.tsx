@@ -33,6 +33,11 @@ const data = {
       icon: UsersIcon,
     },
     {
+      title: "Trámites  ",
+      url: "/tramites",
+      icon: UsersIcon,
+    },
+    {
       title: "Usuarios",
       url: "/administration",
       icon: UsersIcon,

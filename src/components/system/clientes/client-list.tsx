@@ -1,8 +1,7 @@
-// src/components/system/clientes/client-list.tsx
-
 "use client";
 
 import { Plus, Search } from "lucide-react";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
@@ -35,6 +34,7 @@ export function ClientList({
   regiones,
   onRefresh,
 }: ClientListProps) {
+  const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCliente, setSelectedCliente] =
     useState<ClienteListItem | null>(null);
@@ -58,7 +58,7 @@ export function ClientList({
   );
 
   const handleView = (cliente: ClienteListItem) => {
-    toast.info("Vista de detalle en desarrollo");
+    router.push(`/clients/${cliente.id}`);
   };
 
   const handleEdit = (cliente: ClienteListItem) => {
