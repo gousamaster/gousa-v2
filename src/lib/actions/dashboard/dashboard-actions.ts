@@ -64,7 +64,7 @@ export type ProximaCita = {
   participantes: number;
 };
 
-export type CumpleañosHoy = {
+export type CumpleanosHoy = {
   id: string;
   nombreCompleto: string;
   edad: number;
@@ -391,8 +391,8 @@ export async function obtenerProximasCitas(
   }
 }
 
-export async function obtenerCumpleañosHoy(): Promise<
-  ActionResult<CumpleañosHoy[]>
+export async function obtenerCumpleanosHoy(): Promise<
+  ActionResult<CumpleanosHoy[]>
 > {
   try {
     const hoy = new Date();

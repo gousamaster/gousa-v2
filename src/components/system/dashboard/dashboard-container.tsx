@@ -42,13 +42,13 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Skeleton } from "@/components/ui/skeleton";
 import {
-  type CumpleañosHoy,
+  type CumpleanosHoy,
   type DesempenoUsuario,
   type EstadoTramitesDistribucion,
   type EvolucionMensual,
   type FiltroFecha,
   type KpiGeneral,
-  obtenerCumpleañosHoy,
+  obtenerCumpleanosHoy,
   obtenerDesempenoUsuarios,
   obtenerDistribucionEstadosTramites,
   obtenerEvolucionMensual,
@@ -98,7 +98,7 @@ export function DashboardContainer({
   const [evolucion, setEvolucion] = useState<EvolucionMensual[]>([]);
   const [usuarios, setUsuarios] = useState<DesempenoUsuario[]>([]);
   const [proximasCitas, setProximasCitas] = useState<ProximaCita[]>([]);
-  const [cumpleanos, setCumpleanos] = useState<CumpleañosHoy[]>([]);
+  const [cumpleanos, setCumpleanos] = useState<CumpleanosHoy[]>([]);
   const [estadosTramites, setEstadosTramites] = useState<
     EstadoTramitesDistribucion[]
   >([]);
@@ -113,7 +113,7 @@ export function DashboardContainer({
       obtenerEvolucionMensual(filtro),
       obtenerDesempenoUsuarios(filtro),
       obtenerProximasCitas(8),
-      obtenerCumpleañosHoy(),
+      obtenerCumpleanosHoy(),
       obtenerDistribucionEstadosTramites(filtro),
       obtenerServiciosPopulares(filtro),
     ]);
@@ -692,7 +692,7 @@ function ProximasCitasList({ citas }: { citas: ProximaCita[] }) {
 
 // ─── Cumpleaños de hoy ────────────────────────────────────────────────────────
 
-function CumpleanosList({ cumpleanos }: { cumpleanos: CumpleañosHoy[] }) {
+function CumpleanosList({ cumpleanos }: { cumpleanos: CumpleanosHoy[] }) {
   if (cumpleanos.length === 0) return null;
 
   return (
