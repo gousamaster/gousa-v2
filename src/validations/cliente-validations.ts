@@ -2,6 +2,7 @@
 
 import { TipoCliente } from "@prisma/client";
 import { z } from "zod";
+import { optionalDateSchema } from "@/lib/validations/date-helpers";
 
 export const createClienteSchema = z.object({
   nombres: z
@@ -15,13 +16,20 @@ export const createClienteSchema = z.object({
     .max(255, "Los apellidos no pueden exceder 255 caracteres")
     .trim(),
   tipoCliente: z.nativeEnum(TipoCliente),
-  fechaNacimiento: z.coerce.date().optional(),
-  lugarNacimiento: z.string().max(255).trim().optional(),
-  nacionalidad: z.string().max(100).trim().optional(),
-  numeroCi: z.string().max(50).trim().optional(),
-  numeroPasaporte: z.string().max(50).trim().optional(),
-  email: z.string().email("Email inválido").max(255).trim().optional(),
-  telefonoCelular: z.string().max(50).trim().optional(),
+  fechaNacimiento: optionalDateSchema,
+  lugarNacimiento: z.string().max(255).trim().optional().nullable(),
+  nacionalidad: z.string().max(100).trim().optional().nullable(),
+  numeroCi: z.string().max(50).trim().optional().nullable(),
+  numeroPasaporte: z.string().max(50).trim().optional().nullable(),
+  email: z
+    .string()
+    .email("Email inválido")
+    .max(255)
+    .trim()
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  telefonoCelular: z.string().max(50).trim().optional().nullable(),
   regionId: z.string().min(1, "La región es requerida"),
   registradoPorId: z.string().min(1, "El usuario registrador es requerido"),
 });
@@ -40,7 +48,7 @@ export const updateClienteSchema = z.object({
     .trim()
     .optional(),
   tipoCliente: z.nativeEnum(TipoCliente).optional(),
-  fechaNacimiento: z.coerce.date().optional().nullable(),
+  fechaNacimiento: optionalDateSchema,
   lugarNacimiento: z.string().max(255).trim().optional().nullable(),
   nacionalidad: z.string().max(100).trim().optional().nullable(),
   numeroCi: z.string().max(50).trim().optional().nullable(),
@@ -51,62 +59,48 @@ export const updateClienteSchema = z.object({
     .max(255)
     .trim()
     .optional()
-    .nullable(),
+    .nullable()
+    .or(z.literal("")),
   telefonoCelular: z.string().max(50).trim().optional().nullable(),
   regionId: z.string().optional(),
   activo: z.boolean().optional(),
 });
 
 export const createClienteDatosPersonalesSchema = z.object({
-  pasaporteFechaEmision: z.coerce.date().optional(),
-  pasaporteFechaExpiracion: z.coerce.date().optional(),
-  facebook: z.string().max(255).trim().optional(),
-  instagram: z.string().max(255).trim().optional(),
-  direccionDomicilio: z.string().max(1000).trim().optional(),
-  estadoCivil: z.string().max(50).trim().optional(),
-  profesion: z.string().max(255).trim().optional(),
-  nombrePadre: z.string().max(255).trim().optional(),
-  fechaNacimientoPadre: z.coerce.date().optional(),
-  nombreMadre: z.string().max(255).trim().optional(),
-  fechaNacimientoMadre: z.coerce.date().optional(),
-});
-
-export const updateClienteDatosPersonalesSchema = z.object({
-  pasaporteFechaEmision: z.coerce.date().optional().nullable(),
-  pasaporteFechaExpiracion: z.coerce.date().optional().nullable(),
+  pasaporteFechaEmision: optionalDateSchema,
+  pasaporteFechaExpiracion: optionalDateSchema,
   facebook: z.string().max(255).trim().optional().nullable(),
   instagram: z.string().max(255).trim().optional().nullable(),
   direccionDomicilio: z.string().max(1000).trim().optional().nullable(),
   estadoCivil: z.string().max(50).trim().optional().nullable(),
   profesion: z.string().max(255).trim().optional().nullable(),
   nombrePadre: z.string().max(255).trim().optional().nullable(),
-  fechaNacimientoPadre: z.coerce.date().optional().nullable(),
+  fechaNacimientoPadre: optionalDateSchema,
   nombreMadre: z.string().max(255).trim().optional().nullable(),
-  fechaNacimientoMadre: z.coerce.date().optional().nullable(),
+  fechaNacimientoMadre: optionalDateSchema,
+});
+
+export const updateClienteDatosPersonalesSchema = z.object({
+  pasaporteFechaEmision: optionalDateSchema,
+  pasaporteFechaExpiracion: optionalDateSchema,
+  facebook: z.string().max(255).trim().optional().nullable(),
+  instagram: z.string().max(255).trim().optional().nullable(),
+  direccionDomicilio: z.string().max(1000).trim().optional().nullable(),
+  estadoCivil: z.string().max(50).trim().optional().nullable(),
+  profesion: z.string().max(255).trim().optional().nullable(),
+  nombrePadre: z.string().max(255).trim().optional().nullable(),
+  fechaNacimientoPadre: optionalDateSchema,
+  nombreMadre: z.string().max(255).trim().optional().nullable(),
+  fechaNacimientoMadre: optionalDateSchema,
 });
 
 export const createClienteDatosLaboralesSchema = z.object({
-  lugarTrabajo: z.string().max(255).trim().optional(),
-  cargoTrabajo: z.string().max(255).trim().optional(),
-  descripcionTrabajo: z.string().max(1000).trim().optional(),
-  direccionTrabajo: z.string().max(1000).trim().optional(),
-  telefonoTrabajo: z.string().max(50).trim().optional(),
-  fechaContratacion: z.coerce.date().optional(),
-  percepcionSalarial: z.number().positive().max(9999999.99).optional(),
-  nombreTrabajoAnterior: z.string().max(255).trim().optional(),
-  telefonoTrabajoAnterior: z.string().max(50).trim().optional(),
-  direccionTrabajoAnterior: z.string().max(1000).trim().optional(),
-  fechaInicioTrabajoAnterior: z.coerce.date().optional(),
-  referenciaTrabajoAnterior: z.string().max(1000).trim().optional(),
-});
-
-export const updateClienteDatosLaboralesSchema = z.object({
   lugarTrabajo: z.string().max(255).trim().optional().nullable(),
   cargoTrabajo: z.string().max(255).trim().optional().nullable(),
   descripcionTrabajo: z.string().max(1000).trim().optional().nullable(),
   direccionTrabajo: z.string().max(1000).trim().optional().nullable(),
   telefonoTrabajo: z.string().max(50).trim().optional().nullable(),
-  fechaContratacion: z.coerce.date().optional().nullable(),
+  fechaContratacion: optionalDateSchema,
   percepcionSalarial: z
     .number()
     .positive()
@@ -116,17 +110,37 @@ export const updateClienteDatosLaboralesSchema = z.object({
   nombreTrabajoAnterior: z.string().max(255).trim().optional().nullable(),
   telefonoTrabajoAnterior: z.string().max(50).trim().optional().nullable(),
   direccionTrabajoAnterior: z.string().max(1000).trim().optional().nullable(),
-  fechaInicioTrabajoAnterior: z.coerce.date().optional().nullable(),
+  fechaInicioTrabajoAnterior: optionalDateSchema,
+  referenciaTrabajoAnterior: z.string().max(1000).trim().optional().nullable(),
+});
+
+export const updateClienteDatosLaboralesSchema = z.object({
+  lugarTrabajo: z.string().max(255).trim().optional().nullable(),
+  cargoTrabajo: z.string().max(255).trim().optional().nullable(),
+  descripcionTrabajo: z.string().max(1000).trim().optional().nullable(),
+  direccionTrabajo: z.string().max(1000).trim().optional().nullable(),
+  telefonoTrabajo: z.string().max(50).trim().optional().nullable(),
+  fechaContratacion: optionalDateSchema,
+  percepcionSalarial: z
+    .number()
+    .positive()
+    .max(9999999.99)
+    .optional()
+    .nullable(),
+  nombreTrabajoAnterior: z.string().max(255).trim().optional().nullable(),
+  telefonoTrabajoAnterior: z.string().max(50).trim().optional().nullable(),
+  direccionTrabajoAnterior: z.string().max(1000).trim().optional().nullable(),
+  fechaInicioTrabajoAnterior: optionalDateSchema,
   referenciaTrabajoAnterior: z.string().max(1000).trim().optional().nullable(),
 });
 
 export const createClienteDatosAcademicosSchema = z.object({
-  lugarEstudio: z.string().max(255).trim().optional(),
-  carreraEstudio: z.string().max(255).trim().optional(),
-  direccionEstudio: z.string().max(1000).trim().optional(),
-  telefonoEstudio: z.string().max(50).trim().optional(),
-  fechaInicioEstudio: z.coerce.date().optional(),
-  fechaFinEstudio: z.coerce.date().optional(),
+  lugarEstudio: z.string().max(255).trim().optional().nullable(),
+  carreraEstudio: z.string().max(255).trim().optional().nullable(),
+  direccionEstudio: z.string().max(1000).trim().optional().nullable(),
+  telefonoEstudio: z.string().max(50).trim().optional().nullable(),
+  fechaInicioEstudio: optionalDateSchema,
+  fechaFinEstudio: optionalDateSchema,
 });
 
 export const updateClienteDatosAcademicosSchema = z.object({
@@ -134,43 +148,46 @@ export const updateClienteDatosAcademicosSchema = z.object({
   carreraEstudio: z.string().max(255).trim().optional().nullable(),
   direccionEstudio: z.string().max(1000).trim().optional().nullable(),
   telefonoEstudio: z.string().max(50).trim().optional().nullable(),
-  fechaInicioEstudio: z.coerce.date().optional().nullable(),
-  fechaFinEstudio: z.coerce.date().optional().nullable(),
+  fechaInicioEstudio: optionalDateSchema,
+  fechaFinEstudio: optionalDateSchema,
 });
 
 export const createClienteDatosMatrimonialesSchema = z.object({
-  conyugeNombreCompleto: z.string().max(255).trim().optional(),
-  conyugeFechaNacimiento: z.coerce.date().optional(),
-  conyugeLugarNacimiento: z.string().max(255).trim().optional(),
-  matrimonioFechaInicio: z.coerce.date().optional(),
-  matrimonioFechaFin: z.coerce.date().optional(),
+  conyugeNombreCompleto: z.string().max(255).trim().optional().nullable(),
+  conyugeFechaNacimiento: optionalDateSchema,
+  conyugeLugarNacimiento: z.string().max(255).trim().optional().nullable(),
+  matrimonioFechaInicio: optionalDateSchema,
+  matrimonioFechaFin: optionalDateSchema,
 });
 
 export const updateClienteDatosMatrimonialesSchema = z.object({
   conyugeNombreCompleto: z.string().max(255).trim().optional().nullable(),
-  conyugeFechaNacimiento: z.coerce.date().optional().nullable(),
+  conyugeFechaNacimiento: optionalDateSchema,
   conyugeLugarNacimiento: z.string().max(255).trim().optional().nullable(),
-  matrimonioFechaInicio: z.coerce.date().optional().nullable(),
-  matrimonioFechaFin: z.coerce.date().optional().nullable(),
+  matrimonioFechaInicio: optionalDateSchema,
+  matrimonioFechaFin: optionalDateSchema,
 });
 
 export const createClienteDatosPatrocinadorSchema = z.object({
-  nombrePatrocinador: z.string().max(255).trim().optional(),
-  direccionPatrocinador: z.string().max(1000).trim().optional(),
-  telefonoPatrocinador: z.string().max(50).trim().optional(),
+  nombrePatrocinador: z.string().max(255).trim().optional().nullable(),
+  direccionPatrocinador: z.string().max(1000).trim().optional().nullable(),
+  telefonoPatrocinador: z.string().max(50).trim().optional().nullable(),
   emailPatrocinador: z
     .string()
     .email("Email inválido")
     .max(255)
     .trim()
-    .optional(),
-  trabajoPatrocinador: z.string().max(255).trim().optional(),
-  fechaInicioTrabajoPatrocinador: z.coerce.date().optional(),
+    .optional()
+    .nullable()
+    .or(z.literal("")),
+  trabajoPatrocinador: z.string().max(255).trim().optional().nullable(),
+  fechaInicioTrabajoPatrocinador: optionalDateSchema,
   percepcionSalarialPatrocinador: z
     .number()
     .positive()
     .max(9999999.99)
-    .optional(),
+    .optional()
+    .nullable(),
 });
 
 export const updateClienteDatosPatrocinadorSchema = z.object({
@@ -183,9 +200,10 @@ export const updateClienteDatosPatrocinadorSchema = z.object({
     .max(255)
     .trim()
     .optional()
-    .nullable(),
+    .nullable()
+    .or(z.literal("")),
   trabajoPatrocinador: z.string().max(255).trim().optional().nullable(),
-  fechaInicioTrabajoPatrocinador: z.coerce.date().optional().nullable(),
+  fechaInicioTrabajoPatrocinador: optionalDateSchema,
   percepcionSalarialPatrocinador: z
     .number()
     .positive()

@@ -274,7 +274,7 @@ export async function crearCliente(
 
 export async function crearClienteCompleto(
   input: CreateClienteCompletoFormData,
-): Promise<ActionResult<ClienteCompleto>> {
+): Promise<ActionResult<{ id: string }>> {
   try {
     const validated = createClienteCompletoSchema.parse(input);
 
@@ -300,118 +300,99 @@ export async function crearClienteCompleto(
       };
     }
 
-    const cliente = await db.$transaction(async (tx) => {
-      const nuevoCliente = await tx.cliente.create({
-        data: validated.cliente,
-      });
-
-      if (validated.datosPersonales) {
-        await tx.clienteDatosPersonales.create({
-          data: {
-            clienteId: nuevoCliente.id,
-            ...validated.datosPersonales,
-          },
+    const clienteId = await db.$transaction(
+      async (tx) => {
+        const nuevoCliente = await tx.cliente.create({
+          data: validated.cliente,
         });
-      }
 
-      if (validated.datosLaborales) {
-        await tx.clienteDatosLaborales.create({
-          data: {
-            clienteId: nuevoCliente.id,
-            ...validated.datosLaborales,
-          },
-        });
-      }
+        const operations = [];
 
-      if (validated.datosAcademicos) {
-        await tx.clienteDatosAcademicos.create({
-          data: {
-            clienteId: nuevoCliente.id,
-            ...validated.datosAcademicos,
-          },
-        });
-      }
+        if (
+          validated.datosPersonales &&
+          Object.keys(validated.datosPersonales).length > 0
+        ) {
+          operations.push(
+            tx.clienteDatosPersonales.create({
+              data: {
+                clienteId: nuevoCliente.id,
+                ...validated.datosPersonales,
+              },
+            }),
+          );
+        }
 
-      if (validated.datosMatrimoniales) {
-        await tx.clienteDatosMatrimoniales.create({
-          data: {
-            clienteId: nuevoCliente.id,
-            ...validated.datosMatrimoniales,
-          },
-        });
-      }
+        if (
+          validated.datosLaborales &&
+          Object.keys(validated.datosLaborales).length > 0
+        ) {
+          operations.push(
+            tx.clienteDatosLaborales.create({
+              data: {
+                clienteId: nuevoCliente.id,
+                ...validated.datosLaborales,
+              },
+            }),
+          );
+        }
 
-      if (validated.datosPatrocinador) {
-        await tx.clienteDatosPatrocinador.create({
-          data: {
-            clienteId: nuevoCliente.id,
-            ...validated.datosPatrocinador,
-          },
-        });
-      }
+        if (
+          validated.datosAcademicos &&
+          Object.keys(validated.datosAcademicos).length > 0
+        ) {
+          operations.push(
+            tx.clienteDatosAcademicos.create({
+              data: {
+                clienteId: nuevoCliente.id,
+                ...validated.datosAcademicos,
+              },
+            }),
+          );
+        }
 
-      const clienteCompleto = await tx.cliente.findUnique({
-        where: { id: nuevoCliente.id },
-        include: {
-          region: {
-            select: {
-              id: true,
-              nombre: true,
-              codigo: true,
-            },
-          },
-          registradoPor: {
-            select: {
-              id: true,
-              name: true,
-              email: true,
-            },
-          },
-          datosPersonales: true,
-          datosLaborales: true,
-          datosAcademicos: true,
-          datosMatrimoniales: true,
-          datosPatrocinador: true,
-        },
-      });
+        if (
+          validated.datosMatrimoniales &&
+          Object.keys(validated.datosMatrimoniales).length > 0
+        ) {
+          operations.push(
+            tx.clienteDatosMatrimoniales.create({
+              data: {
+                clienteId: nuevoCliente.id,
+                ...validated.datosMatrimoniales,
+              },
+            }),
+          );
+        }
 
-      return clienteCompleto;
-    });
+        if (
+          validated.datosPatrocinador &&
+          Object.keys(validated.datosPatrocinador).length > 0
+        ) {
+          operations.push(
+            tx.clienteDatosPatrocinador.create({
+              data: {
+                clienteId: nuevoCliente.id,
+                ...validated.datosPatrocinador,
+              },
+            }),
+          );
+        }
 
-    if (!cliente) {
-      return {
-        success: false,
-        error: "Error al crear el cliente completo",
-      };
-    }
+        if (operations.length > 0) {
+          await Promise.all(operations);
+        }
 
-    const clienteFormateado: ClienteCompleto = {
-      ...cliente,
-      datosPersonales: cliente.datosPersonales ?? undefined,
-      datosLaborales: cliente.datosLaborales
-        ? {
-            ...cliente.datosLaborales,
-            percepcionSalarial: cliente.datosLaborales.percepcionSalarial
-              ? Number(cliente.datosLaborales.percepcionSalarial)
-              : null,
-          }
-        : undefined,
-      datosAcademicos: cliente.datosAcademicos ?? undefined,
-      datosMatrimoniales: cliente.datosMatrimoniales ?? undefined,
-      datosPatrocinador: cliente.datosPatrocinador
-        ? {
-            ...cliente.datosPatrocinador,
-            percepcionSalarialPatrocinador: cliente.datosPatrocinador
-              .percepcionSalarialPatrocinador
-              ? Number(cliente.datosPatrocinador.percepcionSalarialPatrocinador)
-              : null,
-          }
-        : undefined,
-    };
+        return nuevoCliente.id;
+      },
+      {
+        maxWait: 10000,
+        timeout: 15000,
+      },
+    );
 
     return {
       success: true,
-      data: clienteFormateado,
+      data: { id: clienteId },
     };
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
@@ -429,6 +410,13 @@ export async function crearClienteCompleto(
             error: "Ya existe un cliente con este número de pasaporte",
           };
         }
+      }
+      if (error.code === "P2028") {
+        return {
+          success: false,
+          error:
+            "La operación tardó demasiado tiempo. Por favor, intenta nuevamente.",
+        };
       }
     }
 

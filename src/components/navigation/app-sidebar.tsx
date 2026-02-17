@@ -28,6 +28,11 @@ const data = {
       icon: AppWindowIcon,
     },
     {
+      title: "Clientes",
+      url: "/clients",
+      icon: UsersIcon,
+    },
+    {
       title: "Usuarios",
       url: "/administration",
       icon: UsersIcon,
