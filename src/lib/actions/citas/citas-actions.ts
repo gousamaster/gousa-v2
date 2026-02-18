@@ -3,6 +3,7 @@
 "use server";
 
 import { db } from "@/lib/db";
+import { parseLocalDateTime } from "@/lib/utils/date-timezone";
 import type { ActionResult } from "@/types/action-result-types";
 import {
   type CreateCitaFormData,
@@ -232,7 +233,7 @@ export async function crearCita(
           tramiteId: validated.tramiteId ?? null,
           grupoFamiliarId: validated.grupoFamiliarId ?? null,
           tipoCitaId: validated.tipoCitaId,
-          fechaHora: new Date(validated.fechaHora),
+          fechaHora: parseLocalDateTime(validated.fechaHora),
           lugar: validated.lugar ?? null,
           precioAcordado: validated.precioAcordado,
           descuentoAplicado: validated.descuentoAplicado ?? null,
@@ -283,7 +284,7 @@ export async function actualizarCita(
       data: {
         ...validated,
         fechaHora: validated.fechaHora
-          ? new Date(validated.fechaHora)
+          ? parseLocalDateTime(validated.fechaHora)
           : undefined,
       },
     });

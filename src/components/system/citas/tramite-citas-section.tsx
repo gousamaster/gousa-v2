@@ -12,6 +12,7 @@ import {
   type CitaListItem,
   obtenerCitasPorTramite,
 } from "@/lib/actions/citas/citas-actions";
+import { adjustDateForDisplay } from "@/lib/utils/date-timezone";
 import { CitaDetalleDrawer } from "./cita-detalle-drawer";
 import { ProgramarCitaDrawer } from "./programar-cita-drawer";
 
@@ -83,38 +84,44 @@ export function TramiteCitasSection({
         </div>
       ) : (
         <div className="space-y-2">
-          {citas.map((cita) => (
-            <button
-              key={cita.id}
-              type="button"
-              onClick={() => setCitaDetalleId(cita.id)}
-              className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors"
-            >
-              <div className="flex items-center justify-between gap-2">
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">
-                    {cita.tipoCita.nombre}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {format(new Date(cita.fechaHora), "dd MMM yyyy — HH:mm", {
-                      locale: es,
-                    })}
-                    {cita.lugar && ` · ${cita.lugar}`}
-                  </p>
-                </div>
-                <div className="flex items-center gap-2 shrink-0">
-                  {cita._count.participantes > 1 && (
-                    <Badge variant="outline" className="text-xs">
-                      {cita._count.participantes} participantes
+          {citas.map((cita) => {
+            const fechaAjustada = adjustDateForDisplay(
+              new Date(cita.fechaHora),
+            );
+
+            return (
+              <button
+                key={cita.id}
+                type="button"
+                onClick={() => setCitaDetalleId(cita.id)}
+                className="w-full text-left p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="min-w-0">
+                    <p className="text-sm font-medium truncate">
+                      {cita.tipoCita.nombre}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(fechaAjustada, "dd MMM yyyy — HH:mm", {
+                        locale: es,
+                      })}
+                      {cita.lugar && ` · ${cita.lugar}`}
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 shrink-0">
+                    {cita._count.participantes > 1 && (
+                      <Badge variant="outline" className="text-xs">
+                        {cita._count.participantes} participantes
+                      </Badge>
+                    )}
+                    <Badge className={ESTADO_COLORS[cita.estado] ?? ""}>
+                      {ESTADO_LABELS[cita.estado] ?? cita.estado}
                     </Badge>
-                  )}
-                  <Badge className={ESTADO_COLORS[cita.estado] ?? ""}>
-                    {ESTADO_LABELS[cita.estado] ?? cita.estado}
-                  </Badge>
+                  </div>
                 </div>
-              </div>
-            </button>
-          ))}
+              </button>
+            );
+          })}
         </div>
       )}
 

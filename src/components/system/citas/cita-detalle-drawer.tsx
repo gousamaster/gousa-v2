@@ -36,6 +36,10 @@ import {
 } from "@/lib/actions/citas/citas-actions";
 import { obtenerEstadosPago } from "@/lib/actions/tramites/servicios-actions";
 import {
+  adjustDateForDisplay,
+  formatForDateTimeLocal,
+} from "@/lib/utils/date-timezone";
+import {
   type UpdateCitaFormData,
   updateCitaSchema,
 } from "@/validations/cita-validations";
@@ -141,19 +145,17 @@ function CitaInfoHeader({ cita }: { cita: CitaDetalle }) {
     REPROGRAMADA: "bg-yellow-100 text-yellow-800",
   };
 
+  const fechaAjustada = adjustDateForDisplay(new Date(cita.fechaHora));
+
   return (
     <div className="space-y-2">
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="font-semibold text-lg">{cita.tipoCita.nombre}</p>
           <p className="text-sm text-muted-foreground">
-            {format(
-              new Date(cita.fechaHora),
-              "EEEE dd 'de' MMMM yyyy — HH:mm",
-              {
-                locale: es,
-              },
-            )}
+            {format(fechaAjustada, "EEEE dd 'de' MMMM yyyy — HH:mm", {
+              locale: es,
+            })}
           </p>
           {cita.lugar && (
             <p className="text-sm text-muted-foreground">{cita.lugar}</p>
@@ -214,7 +216,9 @@ function EditarCitaForm({
   const { register, control, handleSubmit } = useForm<UpdateCitaFormData>({
     resolver: zodResolver(updateCitaSchema),
     defaultValues: {
-      fechaHora: format(new Date(cita.fechaHora), "yyyy-MM-dd'T'HH:mm"),
+      fechaHora: formatForDateTimeLocal(
+        adjustDateForDisplay(new Date(cita.fechaHora)),
+      ),
       lugar: cita.lugar ?? "",
       precioAcordado: cita.precioFinal,
       precioFinal: cita.precioFinal,

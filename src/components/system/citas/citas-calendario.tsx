@@ -22,6 +22,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { CitaListItem } from "@/lib/actions/citas/citas-actions";
 import { cn } from "@/lib/utils";
+import { adjustDateForDisplay } from "@/lib/utils/date-timezone";
 import { CitaDetalleDrawer } from "./cita-detalle-drawer";
 
 interface CitasCalendarioProps {
@@ -54,7 +55,9 @@ export function CitasCalendario({ citas, onRefresh }: CitasCalendarioProps) {
   const diasDelGrid = eachDayOfInterval({ start: inicioGrid, end: finGrid });
 
   const citasPorDia = (dia: Date): CitaListItem[] =>
-    citas.filter((c) => isSameDay(new Date(c.fechaHora), dia));
+    citas.filter((c) =>
+      isSameDay(adjustDateForDisplay(new Date(c.fechaHora)), dia),
+    );
 
   return (
     <>
@@ -226,8 +229,9 @@ function EventoCita({
   cita: CitaListItem;
   onClick: () => void;
 }) {
+  const fechaAjustada = adjustDateForDisplay(new Date(cita.fechaHora));
   const color = ESTADO_COLORS[cita.estado] ?? "#6b7280";
-  const hora = format(new Date(cita.fechaHora), "HH:mm");
+  const hora = format(fechaAjustada, "HH:mm");
 
   const nombreCliente = cita.tramite
     ? `${cita.tramite.cliente.apellidos}`

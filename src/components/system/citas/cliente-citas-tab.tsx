@@ -13,6 +13,7 @@ import {
   obtenerCitasPorTramite,
 } from "@/lib/actions/citas/citas-actions";
 import { obtenerTramitesPorCliente } from "@/lib/actions/tramites/tramites-actions";
+import { adjustDateForDisplay } from "@/lib/utils/date-timezone";
 import { CitaDetalleDrawer } from "./cita-detalle-drawer";
 
 interface ClienteCitasTabProps {
@@ -61,7 +62,8 @@ export function ClienteCitasTab({ clienteId }: ClienteCitasTabProps) {
       .flatMap((r) => (r.success && r.data ? r.data : []))
       .sort(
         (a, b) =>
-          new Date(b.fechaHora).getTime() - new Date(a.fechaHora).getTime(),
+          adjustDateForDisplay(new Date(b.fechaHora)).getTime() -
+          adjustDateForDisplay(new Date(a.fechaHora)).getTime(),
       );
 
     const citasSinDuplicados = Array.from(
@@ -96,77 +98,81 @@ export function ClienteCitasTab({ clienteId }: ClienteCitasTabProps) {
   return (
     <>
       <div className="space-y-3">
-        {citas.map((cita) => (
-          <Card
-            key={cita.id}
-            className="cursor-pointer hover:shadow-md transition-shadow"
-            onClick={() => setCitaDetalleId(cita.id)}
-          >
-            <CardContent className="py-4">
-              <div className="flex items-start justify-between gap-4">
-                <div className="space-y-1">
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <p className="font-medium text-sm">
-                      {cita.tipoCita.nombre}
-                    </p>
-                    {cita._count.participantes > 1 && (
-                      <Badge variant="outline" className="text-xs">
-                        {cita._count.participantes} participantes
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-xs text-muted-foreground">
-                    {format(
-                      new Date(cita.fechaHora),
-                      "EEEE dd 'de' MMMM yyyy — HH:mm",
-                      { locale: es },
-                    )}
-                  </p>
-                  {cita.lugar && (
-                    <p className="text-xs text-muted-foreground">
-                      {cita.lugar}
-                    </p>
-                  )}
-                  {cita.tramite && (
-                    <p className="text-xs text-muted-foreground">
-                      Trámite: {cita.tramite.servicio.nombre}
-                    </p>
-                  )}
-                  {cita.grupoFamiliar && (
-                    <p className="text-xs text-muted-foreground">
-                      Grupo: {cita.grupoFamiliar.nombre}
-                    </p>
-                  )}
-                </div>
+        {citas.map((cita) => {
+          const fechaAjustada = adjustDateForDisplay(new Date(cita.fechaHora));
 
-                <div className="flex flex-col items-end gap-2 shrink-0">
-                  <Badge className={ESTADO_COLORS[cita.estado] ?? ""}>
-                    {ESTADO_LABELS[cita.estado] ?? cita.estado}
-                  </Badge>
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs font-medium">
-                      {cita.precioFinal.toLocaleString("es-BO")} Bs.
-                    </span>
-                    <Badge
-                      style={
-                        cita.estadoPago.color
-                          ? {
-                              backgroundColor: cita.estadoPago.color,
-                              color: "#fff",
-                            }
-                          : undefined
-                      }
-                      variant={cita.estadoPago.color ? undefined : "secondary"}
-                      className="text-xs"
-                    >
-                      {cita.estadoPago.nombre}
+          return (
+            <Card
+              key={cita.id}
+              className="cursor-pointer hover:shadow-md transition-shadow"
+              onClick={() => setCitaDetalleId(cita.id)}
+            >
+              <CardContent className="py-4">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium text-sm">
+                        {cita.tipoCita.nombre}
+                      </p>
+                      {cita._count.participantes > 1 && (
+                        <Badge variant="outline" className="text-xs">
+                          {cita._count.participantes} participantes
+                        </Badge>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {format(fechaAjustada, "EEEE dd 'de' MMMM yyyy — HH:mm", {
+                        locale: es,
+                      })}
+                    </p>
+                    {cita.lugar && (
+                      <p className="text-xs text-muted-foreground">
+                        {cita.lugar}
+                      </p>
+                    )}
+                    {cita.tramite && (
+                      <p className="text-xs text-muted-foreground">
+                        Trámite: {cita.tramite.servicio.nombre}
+                      </p>
+                    )}
+                    {cita.grupoFamiliar && (
+                      <p className="text-xs text-muted-foreground">
+                        Grupo: {cita.grupoFamiliar.nombre}
+                      </p>
+                    )}
+                  </div>
+
+                  <div className="flex flex-col items-end gap-2 shrink-0">
+                    <Badge className={ESTADO_COLORS[cita.estado] ?? ""}>
+                      {ESTADO_LABELS[cita.estado] ?? cita.estado}
                     </Badge>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-medium">
+                        {cita.precioFinal.toLocaleString("es-BO")} Bs.
+                      </span>
+                      <Badge
+                        style={
+                          cita.estadoPago.color
+                            ? {
+                                backgroundColor: cita.estadoPago.color,
+                                color: "#fff",
+                              }
+                            : undefined
+                        }
+                        variant={
+                          cita.estadoPago.color ? undefined : "secondary"
+                        }
+                        className="text-xs"
+                      >
+                        {cita.estadoPago.nombre}
+                      </Badge>
+                    </div>
                   </div>
                 </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
+              </CardContent>
+            </Card>
+          );
+        })}
       </div>
 
       {citaDetalleId && (
