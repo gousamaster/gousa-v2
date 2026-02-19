@@ -26,7 +26,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { obtenerClientePorId } from "@/lib/actions/clientes/clientes-actions";
+import { obtenerDatosClienteParaPdf } from "@/lib/actions/clientes/descarga-pdf-actions";
 import { descargarFichaClientePdf } from "@/lib/pdf/ficha-cliente-pdf";
 import type { ClienteListItem } from "@/types/cliente-types";
 
@@ -56,14 +56,15 @@ function ClientActions({
   const handleDescargarFicha = async () => {
     setIsDownloading(true);
     try {
-      const result = await obtenerClientePorId(cliente.id);
+      const result = await obtenerDatosClienteParaPdf(cliente.id);
       if (!result.success || !result.data) {
         toast.error("No se pudo obtener los datos del cliente");
         return;
       }
       await descargarFichaClientePdf(result.data);
       toast.success("Ficha descargada correctamente");
-    } catch {
+    } catch (error) {
+      console.error("Error al generar PDF:", error);
       toast.error("Error al generar el PDF");
     } finally {
       setIsDownloading(false);

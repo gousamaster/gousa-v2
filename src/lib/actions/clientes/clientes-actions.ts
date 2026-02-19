@@ -162,6 +162,8 @@ export async function obtenerClientePorId(
         datosAcademicos: true,
         datosMatrimoniales: true,
         datosPatrocinador: true,
+        datosViaje: true,
+        gruposFamiliares: true,
       },
     });
 
@@ -194,6 +196,7 @@ export async function obtenerClientePorId(
               : null,
           }
         : undefined,
+      datosViaje: cliente.datosViaje ?? undefined,
     };
 
     return {
@@ -373,6 +376,20 @@ export async function crearClienteCompleto(
               data: {
                 clienteId: nuevoCliente.id,
                 ...validated.datosPatrocinador,
+              },
+            }),
+          );
+        }
+
+        if (
+          validated.datosViaje &&
+          Object.keys(validated.datosViaje).length > 0
+        ) {
+          operations.push(
+            tx.clienteDatosViaje.create({
+              data: {
+                clienteId: nuevoCliente.id,
+                ...validated.datosViaje,
               },
             }),
           );

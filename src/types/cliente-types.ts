@@ -98,6 +98,21 @@ export interface ClienteDatosPatrocinador {
   updatedAt: Date;
 }
 
+export interface ClienteDatosViaje {
+  id: string;
+  clienteId: string;
+  motivo: string | null;
+  lugar: string | null;
+  fechaTentativa: Date | null;
+  tiempoEstadia: string | null;
+  contactoDestino: string | null;
+  direccionContacto: string | null;
+  telefonoContacto: string | null;
+  paisesVisitados: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
 export interface ClienteCompleto extends Cliente {
   region: {
     id: string;
@@ -114,6 +129,7 @@ export interface ClienteCompleto extends Cliente {
   datosAcademicos?: ClienteDatosAcademicos;
   datosMatrimoniales?: ClienteDatosMatrimoniales;
   datosPatrocinador?: ClienteDatosPatrocinador;
+  datosViaje?: ClienteDatosViaje;
 }
 
 export interface ClienteListItem {
@@ -272,6 +288,28 @@ export interface UpdateClienteDatosPatrocinadorInput {
   percepcionSalarialPatrocinador?: number | null;
 }
 
+export interface CreateClienteDatosViajeInput {
+  motivo?: string;
+  lugar?: string;
+  fechaTentativa?: Date;
+  tiempoEstadia?: string;
+  contactoDestino?: string;
+  direccionContacto?: string;
+  telefonoContacto?: string;
+  paisesVisitados?: string;
+}
+
+export interface UpdateClienteDatosViajeInput {
+  motivo?: string | null;
+  lugar?: string | null;
+  fechaTentativa?: Date | null;
+  tiempoEstadia?: string | null;
+  contactoDestino?: string | null;
+  direccionContacto?: string | null;
+  telefonoContacto?: string | null;
+  paisesVisitados?: string | null;
+}
+
 export interface CreateClienteCompletoInput {
   cliente: CreateClienteInput;
   datosPersonales?: CreateClienteDatosPersonalesInput;
@@ -279,4 +317,5 @@ export interface CreateClienteCompletoInput {
   datosAcademicos?: CreateClienteDatosAcademicosInput;
   datosMatrimoniales?: CreateClienteDatosMatrimonialesInput;
   datosPatrocinador?: CreateClienteDatosPatrocinadorInput;
+  datosViaje?: CreateClienteDatosViajeInput;
 }

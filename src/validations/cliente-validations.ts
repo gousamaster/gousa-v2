@@ -212,6 +212,28 @@ export const updateClienteDatosPatrocinadorSchema = z.object({
     .nullable(),
 });
 
+export const createClienteDatosViajeSchema = z.object({
+  motivo: z.string().max(500).trim().optional().nullable(),
+  lugar: z.string().max(255).trim().optional().nullable(),
+  fechaTentativa: optionalDateSchema,
+  tiempoEstadia: z.string().max(255).trim().optional().nullable(),
+  contactoDestino: z.string().max(255).trim().optional().nullable(),
+  direccionContacto: z.string().max(500).trim().optional().nullable(),
+  telefonoContacto: z.string().max(50).trim().optional().nullable(),
+  paisesVisitados: z.string().max(2000).trim().optional().nullable(),
+});
+
+export const updateClienteDatosViajeSchema = z.object({
+  motivo: z.string().max(500).trim().optional().nullable(),
+  lugar: z.string().max(255).trim().optional().nullable(),
+  fechaTentativa: optionalDateSchema,
+  tiempoEstadia: z.string().max(255).trim().optional().nullable(),
+  contactoDestino: z.string().max(255).trim().optional().nullable(),
+  direccionContacto: z.string().max(500).trim().optional().nullable(),
+  telefonoContacto: z.string().max(50).trim().optional().nullable(),
+  paisesVisitados: z.string().max(2000).trim().optional().nullable(),
+});
+
 export const createClienteCompletoSchema = z.object({
   cliente: createClienteSchema,
   datosPersonales: createClienteDatosPersonalesSchema.optional(),
@@ -219,6 +241,7 @@ export const createClienteCompletoSchema = z.object({
   datosAcademicos: createClienteDatosAcademicosSchema.optional(),
   datosMatrimoniales: createClienteDatosMatrimonialesSchema.optional(),
   datosPatrocinador: createClienteDatosPatrocinadorSchema.optional(),
+  datosViaje: createClienteDatosViajeSchema.optional(),
 });
 
 export type CreateClienteFormData = z.infer<typeof createClienteSchema>;
@@ -252,6 +275,12 @@ export type CreateClienteDatosPatrocinadorFormData = z.infer<
 >;
 export type UpdateClienteDatosPatrocinadorFormData = z.infer<
   typeof updateClienteDatosPatrocinadorSchema
+>;
+export type CreateClienteDatosViajeFormData = z.infer<
+  typeof createClienteDatosViajeSchema
+>;
+export type UpdateClienteDatosViajeFormData = z.infer<
+  typeof updateClienteDatosViajeSchema
 >;
 export type CreateClienteCompletoFormData = z.infer<
   typeof createClienteCompletoSchema

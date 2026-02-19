@@ -389,6 +389,7 @@ model Cliente {
   @@index([activo])
   @@index([deletedAt])
   @@map("cliente")
+  datosViaje ClienteDatosViaje[]
 }
 
 /// Datos personales adicionales (solo para adultos)
@@ -497,6 +498,26 @@ model ClienteDatosPatrocinador {
 
   @@index([clienteId])
   @@map("cliente_datos_patrocinador")
+}
+
+model ClienteDatosViaje {
+  id                  String    @id @default(cuid())
+  clienteId           String    @unique
+  motivo              String?
+  lugar               String?
+  fechaTentativa      DateTime?
+  tiempoEstadia       String?
+  contactoDestino     String?
+  direccionContacto   String?
+  telefonoContacto    String?
+  paisesVisitados     String?
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+
+  cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+  @@index([clienteId])
+  @@map("cliente_datos_viaje")
 }
 
 // ============================================

@@ -1,4 +1,5 @@
 // src/lib/pdf/ficha-cliente-pdf.ts
+// ARCHIVO COMPLETO con datos de viaje incluidos
 
 import type { ClienteCompleto } from "@/types/cliente-types";
 
@@ -150,6 +151,23 @@ function buildSecciones(cliente: ClienteCompleto): Seccion[] {
         titulo: "Datos del Patrocinador",
         campos: patrocinador,
       });
+  }
+
+  // ── Datos de Viaje ─────────────────────────────────────────────────────────
+  if (cliente.datosViaje) {
+    const dv = cliente.datosViaje;
+    const viaje = campos([
+      ["Motivo del Viaje", fmt(dv.motivo)],
+      ["Lugar de Destino", fmt(dv.lugar)],
+      ["Fecha Tentativa", fmtDate(dv.fechaTentativa)],
+      ["Tiempo de Estadía", fmt(dv.tiempoEstadia)],
+      ["Contacto en Destino", fmt(dv.contactoDestino)],
+      ["Dirección del Contacto", fmt(dv.direccionContacto)],
+      ["Teléfono del Contacto", fmt(dv.telefonoContacto)],
+      ["Países Visitados", fmt(dv.paisesVisitados)],
+    ]);
+    if (viaje.length > 0)
+      secciones.push({ titulo: "Datos de Viaje", campos: viaje });
   }
 
   return secciones;
