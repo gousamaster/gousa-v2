@@ -4,7 +4,7 @@
 
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Loader2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, useTransition } from "react";
 import { FormProvider, useForm } from "react-hook-form";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -17,9 +17,11 @@ import {
 } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
+  actualizarClienteCompleto,
   crearClienteCompleto,
   obtenerClientePorId,
 } from "@/lib/actions/clientes/clientes-actions";
+import { descargarRespaldosCompletos } from "@/lib/utils/backup-utils";
 import type { ClienteListItem } from "@/types/cliente-types";
 import {
   type CreateClienteCompletoFormData,
@@ -41,11 +43,6 @@ interface ClientFormDrawerProps {
   regiones: Array<{ id: string; nombre: string }>;
 }
 
-/**
- * Drawer para crear o editar clientes
- * Implementa patrón Strategy para manejar formularios por secciones
- * y patrón Observer para notificar cambios al componente padre
- */
 export function ClientFormDrawer({
   open,
   onOpenChange,
@@ -53,19 +50,22 @@ export function ClientFormDrawer({
   onSuccess,
   regiones,
 }: ClientFormDrawerProps) {
-  const [isLoading, setIsLoading] = useState(false);
   const [isLoadingData, setIsLoadingData] = useState(false);
   const [activeTab, setActiveTab] = useState("basicos");
+  const [isPending, startTransition] = useTransition();
   const isEdit = !!cliente;
 
-  const methods = useForm<CreateClienteCompletoFormData>({
+  const lastFormDataRef = useRef<CreateClienteCompletoFormData | null>(null);
+
+  const methods = useForm({
     resolver: zodResolver(createClienteCompletoSchema),
     mode: "onChange",
     defaultValues: {
       cliente: {
         nombres: "",
         apellidos: "",
-        tipoCliente: undefined as any,
+        tipoCliente: "ADULTO",
+        fechaNacimiento: null,
         regionId: "",
         registradoPorId: "",
       },
@@ -76,30 +76,32 @@ export function ClientFormDrawer({
       datosPatrocinador: {},
       datosViaje: {},
     },
-  });
+  } as const);
 
-  // Cargar datos del cliente al editar
   useEffect(() => {
     async function cargarDatosCliente() {
       if (open && cliente) {
         setIsLoadingData(true);
         try {
+          console.log("🔵 [Drawer] Cargando datos del cliente:", cliente.id);
           const result = await obtenerClientePorId(cliente.id);
+
           if (result.success && result.data) {
             const data = result.data;
+            console.log("✅ [Drawer] Datos cargados, reseteando formulario");
 
             methods.reset({
               cliente: {
                 nombres: data.nombres,
                 apellidos: data.apellidos,
                 tipoCliente: data.tipoCliente,
-                fechaNacimiento: data.fechaNacimiento || undefined,
-                lugarNacimiento: data.lugarNacimiento || undefined,
-                nacionalidad: data.nacionalidad || undefined,
-                numeroCi: data.numeroCi || undefined,
-                numeroPasaporte: data.numeroPasaporte || undefined,
-                email: data.email || undefined,
-                telefonoCelular: data.telefonoCelular || undefined,
+                fechaNacimiento: data.fechaNacimiento || null,
+                lugarNacimiento: data.lugarNacimiento || null,
+                nacionalidad: data.nacionalidad || null,
+                numeroCi: data.numeroCi || null,
+                numeroPasaporte: data.numeroPasaporte || null,
+                email: data.email || null,
+                telefonoCelular: data.telefonoCelular || null,
                 regionId: data.regionId,
                 registradoPorId: data.registradoPorId,
               },
@@ -112,7 +114,10 @@ export function ClientFormDrawer({
             });
           }
         } catch (error) {
-          console.error("Error al cargar datos del cliente:", error);
+          console.error(
+            "❌ [Drawer] Error al cargar datos del cliente:",
+            error,
+          );
           toast.error("Error al cargar los datos del cliente");
         } finally {
           setIsLoadingData(false);
@@ -121,11 +126,13 @@ export function ClientFormDrawer({
     }
 
     if (open && !cliente) {
+      console.log("🔵 [Drawer] Modo crear - Reseteando formulario");
       methods.reset({
         cliente: {
           nombres: "",
           apellidos: "",
-          tipoCliente: undefined as any,
+          tipoCliente: "ADULTO",
+          fechaNacimiento: null,
           regionId: "",
           registradoPorId: "",
         },
@@ -137,50 +144,119 @@ export function ClientFormDrawer({
         datosViaje: {},
       });
       setActiveTab("basicos");
+      lastFormDataRef.current = null;
     } else if (open && cliente) {
       cargarDatosCliente();
     }
   }, [open, cliente, methods]);
 
   const handleSubmit = methods.handleSubmit(
-    async (data) => {
-      console.log("Formulario válido, enviando datos:", data);
-      setIsLoading(true);
-      try {
-        // Solo soportamos crear por ahora
-        // TODO: Implementar actualización
-        if (isEdit) {
-          toast.error("La edición aún no está implementada");
-          return;
-        }
+    async (data: CreateClienteCompletoFormData) => {
+      console.log("🔵 [Drawer] Formulario válido, enviando datos:", {
+        modo: isEdit ? "EDITAR" : "CREAR",
+        clienteId: cliente?.id,
+        nombres: data.cliente.nombres,
+        apellidos: data.cliente.apellidos,
+        timestamp: new Date().toISOString(),
+      });
 
-        const result = await crearClienteCompleto(data);
+      lastFormDataRef.current = data;
 
-        if (result.success) {
-          toast.success("Cliente creado correctamente");
-          onSuccess();
-          onOpenChange(false);
-        } else {
-          toast.error(result.error || "Error al procesar la solicitud");
+      startTransition(async () => {
+        try {
+          const result =
+            isEdit && cliente
+              ? await actualizarClienteCompleto(cliente.id, data)
+              : await crearClienteCompleto(data);
+
+          console.log("🔵 [Drawer] Respuesta recibida:", result);
+
+          if (result.success) {
+            console.log(
+              `✅ [Drawer] Cliente ${isEdit ? "actualizado" : "creado"} exitosamente`,
+            );
+            toast.success(
+              isEdit
+                ? "Cliente actualizado correctamente"
+                : "Cliente creado correctamente",
+            );
+            lastFormDataRef.current = null;
+            onSuccess();
+            onOpenChange(false);
+          } else {
+            console.error("❌ [Drawer] Error en respuesta:", result.error);
+
+            console.log(
+              "🛡️ [Drawer] Generando respaldo automático por fallo...",
+            );
+            descargarRespaldosCompletos(data);
+
+            toast.error(result.error || "Error al procesar la solicitud", {
+              duration: 5000,
+              description:
+                "Se ha descargado un respaldo de los datos automáticamente.",
+            });
+          }
+        } catch (error) {
+          const errorObj = error as Error;
+          console.error("❌ [Drawer] Error capturado en cliente:", {
+            error: errorObj,
+            message: errorObj?.message,
+            name: errorObj?.name,
+            stack: errorObj?.stack,
+          });
+
+          console.log(
+            "🛡️ [Drawer] Generando respaldo automático por excepción...",
+          );
+          if (lastFormDataRef.current) {
+            descargarRespaldosCompletos(lastFormDataRef.current);
+          }
+
+          if (
+            errorObj?.message?.includes("Server Action") ||
+            errorObj?.message?.includes("Failed to find")
+          ) {
+            toast.error(
+              "Error de conexión. Por favor, recarga la página (Ctrl+Shift+R) e intenta de nuevo.",
+              {
+                duration: 7000,
+                description:
+                  "Se ha descargado un respaldo de los datos automáticamente.",
+              },
+            );
+          } else {
+            toast.error("Ocurrió un error inesperado. Intenta nuevamente.", {
+              duration: 5000,
+              description:
+                "Se ha descargado un respaldo de los datos automáticamente.",
+            });
+          }
         }
-      } catch (error) {
-        toast.error("Ocurrió un error inesperado");
-        console.error("Error en crearClienteCompleto:", error);
-      } finally {
-        setIsLoading(false);
-      }
+      });
     },
     (errors) => {
-      console.log("Errores de validación:", errors);
-      toast.error("Por favor completa todos los campos obligatorios");
+      console.error("❌ [Drawer] Errores de validación:", errors);
 
-      const firstError = Object.values(errors)[0];
-      if (firstError && typeof firstError === "object") {
-        const nestedError = Object.values(firstError)[0];
-        if (nestedError && "message" in nestedError) {
-          toast.error(String(nestedError.message));
+      let errorMessage = "Por favor completa todos los campos obligatorios";
+
+      if (errors.cliente) {
+        const clienteErrors = errors.cliente;
+        const firstField = Object.keys(clienteErrors)[0];
+        const firstError =
+          clienteErrors[firstField as keyof typeof clienteErrors];
+
+        if (
+          firstError &&
+          typeof firstError === "object" &&
+          "message" in firstError &&
+          typeof firstError.message === "string"
+        ) {
+          errorMessage = firstError.message;
         }
       }
+
+      toast.error(errorMessage);
     },
   );
 
@@ -189,11 +265,11 @@ export function ClientFormDrawer({
       <SheetContent className="w-full sm:max-w-4xl overflow-y-auto">
         <SheetHeader>
           <SheetTitle>
-            {isEdit ? "Ver cliente" : "Crear nuevo cliente"}
+            {isEdit ? "Editar cliente" : "Crear nuevo cliente"}
           </SheetTitle>
           <SheetDescription>
             {isEdit
-              ? "Información del cliente (modo solo lectura)"
+              ? "Modifica los datos del cliente"
               : "Completa los datos para crear un nuevo cliente"}
           </SheetDescription>
         </SheetHeader>
@@ -259,18 +335,16 @@ export function ClientFormDrawer({
                   variant="outline"
                   onClick={() => onOpenChange(false)}
                   className="flex-1"
-                  disabled={isLoading}
+                  disabled={isPending}
                 >
-                  {isEdit ? "Cerrar" : "Cancelar"}
+                  Cancelar
                 </Button>
-                {!isEdit && (
-                  <Button type="submit" className="flex-1" disabled={isLoading}>
-                    {isLoading && (
-                      <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
-                    Crear Cliente
-                  </Button>
-                )}
+                <Button type="submit" className="flex-1" disabled={isPending}>
+                  {isPending && (
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  )}
+                  {isEdit ? "Actualizar Cliente" : "Crear Cliente"}
+                </Button>
               </div>
             </form>
           </FormProvider>

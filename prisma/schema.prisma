@@ -389,7 +389,7 @@ model Cliente {
   @@index([activo])
   @@index([deletedAt])
   @@map("cliente")
-  datosViaje ClienteDatosViaje[]
+  datosViaje ClienteDatosViaje?
 }
 
 /// Datos personales adicionales (solo para adultos)

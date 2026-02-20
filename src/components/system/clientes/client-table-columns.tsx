@@ -18,6 +18,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -39,10 +40,6 @@ interface ClientActionsProps {
   onGrupoFamiliar: (cliente: ClienteListItem) => void;
 }
 
-/**
- * Componente de acciones para cada fila de la tabla de clientes
- * Implementa patrón Command para encapsular las operaciones disponibles
- */
 function ClientActions({
   cliente,
   onView,
@@ -118,10 +115,6 @@ function ClientActions({
   );
 }
 
-/**
- * Factory function para crear las columnas de la tabla de clientes
- * Implementa patrón Factory Method para generar configuración de columnas
- */
 export const createClientColumns = (
   onView: (cliente: ClienteListItem) => void,
   onEdit: (cliente: ClienteListItem) => void,
@@ -129,6 +122,28 @@ export const createClientColumns = (
   onToggle: (cliente: ClienteListItem) => void,
   onGrupoFamiliar: (cliente: ClienteListItem) => void,
 ): ColumnDef<ClienteListItem>[] => [
+  {
+    id: "select",
+    header: ({ table }) => (
+      <Checkbox
+        checked={
+          table.getIsAllPageRowsSelected() ||
+          (table.getIsSomePageRowsSelected() && "indeterminate")
+        }
+        onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
+        aria-label="Seleccionar todos"
+      />
+    ),
+    cell: ({ row }) => (
+      <Checkbox
+        checked={row.getIsSelected()}
+        onCheckedChange={(value) => row.toggleSelected(!!value)}
+        aria-label="Seleccionar fila"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
   {
     accessorKey: "nombreCompleto",
     header: "Nombre Completo",

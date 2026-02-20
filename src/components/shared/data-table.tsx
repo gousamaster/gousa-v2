@@ -9,6 +9,7 @@ import {
   getCoreRowModel,
   getFilteredRowModel,
   getSortedRowModel,
+  type RowSelectionState,
   type SortingState,
   useReactTable,
 } from "@tanstack/react-table";
@@ -25,14 +26,42 @@ import {
 interface DataTableProps<TData, TValue> {
   columns: ColumnDef<TData, TValue>[];
   data: TData[];
+  onRowSelectionChange?: (selection: RowSelectionState) => void;
+  rowSelection?: RowSelectionState;
 }
 
 export function DataTable<TData, TValue>({
   columns,
   data,
+  onRowSelectionChange,
+  rowSelection: controlledRowSelection,
 }: DataTableProps<TData, TValue>) {
   const [sorting, setSorting] = useState<SortingState>([]);
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([]);
+  const [internalRowSelection, setInternalRowSelection] =
+    useState<RowSelectionState>({});
+
+  const isControlled = controlledRowSelection !== undefined;
+  const rowSelection = isControlled
+    ? controlledRowSelection
+    : internalRowSelection;
+
+  const handleRowSelectionChange = (
+    updaterOrValue:
+      | RowSelectionState
+      | ((old: RowSelectionState) => RowSelectionState),
+  ) => {
+    const newValue =
+      typeof updaterOrValue === "function"
+        ? updaterOrValue(rowSelection)
+        : updaterOrValue;
+
+    if (isControlled && onRowSelectionChange) {
+      onRowSelectionChange(newValue);
+    } else {
+      setInternalRowSelection(newValue);
+    }
+  };
 
   const table = useReactTable({
     data,
@@ -42,9 +71,11 @@ export function DataTable<TData, TValue>({
     getSortedRowModel: getSortedRowModel(),
     onColumnFiltersChange: setColumnFilters,
     getFilteredRowModel: getFilteredRowModel(),
+    onRowSelectionChange: handleRowSelectionChange,
     state: {
       sorting,
       columnFilters,
+      rowSelection,
     },
   });
 

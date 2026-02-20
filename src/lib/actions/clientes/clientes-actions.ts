@@ -278,36 +278,69 @@ export async function crearCliente(
 export async function crearClienteCompleto(
   input: CreateClienteCompletoFormData,
 ): Promise<ActionResult<{ id: string }>> {
-  try {
-    const validated = createClienteCompletoSchema.parse(input);
+  console.log("🔵 [crearClienteCompleto] Inicio - Datos recibidos:", {
+    cliente: {
+      nombres: input.cliente?.nombres,
+      apellidos: input.cliente?.apellidos,
+      tipoCliente: input.cliente?.tipoCliente,
+      regionId: input.cliente?.regionId,
+    },
+    timestamp: new Date().toISOString(),
+  });
 
+  try {
+    console.log("🔵 [crearClienteCompleto] Validando datos con Zod...");
+    const validated = createClienteCompletoSchema.parse(input);
+    console.log("✅ [crearClienteCompleto] Validación exitosa");
+
+    console.log(
+      "🔵 [crearClienteCompleto] Verificando región:",
+      validated.cliente.regionId,
+    );
     const regionExiste = await db.region.findUnique({
       where: { id: validated.cliente.regionId },
     });
 
     if (!regionExiste) {
+      console.error("❌ [crearClienteCompleto] Región no encontrada");
       return {
         success: false,
         error: "Región no encontrada",
       };
     }
+    console.log(
+      "✅ [crearClienteCompleto] Región encontrada:",
+      regionExiste.nombre,
+    );
 
+    console.log(
+      "🔵 [crearClienteCompleto] Verificando usuario:",
+      validated.cliente.registradoPorId,
+    );
     const usuarioExiste = await db.user.findUnique({
       where: { id: validated.cliente.registradoPorId },
     });
 
     if (!usuarioExiste) {
+      console.error("❌ [crearClienteCompleto] Usuario no encontrado");
       return {
         success: false,
         error: "Usuario registrador no encontrado",
       };
     }
+    console.log(
+      "✅ [crearClienteCompleto] Usuario encontrado:",
+      usuarioExiste.name,
+    );
 
+    console.log("🔵 [crearClienteCompleto] Iniciando transacción...");
     const clienteId = await db.$transaction(
       async (tx) => {
+        console.log("🔵 [Transaction] Creando cliente base...");
         const nuevoCliente = await tx.cliente.create({
           data: validated.cliente,
         });
+        console.log("✅ [Transaction] Cliente creado:", nuevoCliente.id);
 
         const operations = [];
 
@@ -315,6 +348,7 @@ export async function crearClienteCompleto(
           validated.datosPersonales &&
           Object.keys(validated.datosPersonales).length > 0
         ) {
+          console.log("🔵 [Transaction] Agregando datosPersonales");
           operations.push(
             tx.clienteDatosPersonales.create({
               data: {
@@ -329,6 +363,7 @@ export async function crearClienteCompleto(
           validated.datosLaborales &&
           Object.keys(validated.datosLaborales).length > 0
         ) {
+          console.log("🔵 [Transaction] Agregando datosLaborales");
           operations.push(
             tx.clienteDatosLaborales.create({
               data: {
@@ -343,6 +378,7 @@ export async function crearClienteCompleto(
           validated.datosAcademicos &&
           Object.keys(validated.datosAcademicos).length > 0
         ) {
+          console.log("🔵 [Transaction] Agregando datosAcademicos");
           operations.push(
             tx.clienteDatosAcademicos.create({
               data: {
@@ -357,6 +393,7 @@ export async function crearClienteCompleto(
           validated.datosMatrimoniales &&
           Object.keys(validated.datosMatrimoniales).length > 0
         ) {
+          console.log("🔵 [Transaction] Agregando datosMatrimoniales");
           operations.push(
             tx.clienteDatosMatrimoniales.create({
               data: {
@@ -371,6 +408,7 @@ export async function crearClienteCompleto(
           validated.datosPatrocinador &&
           Object.keys(validated.datosPatrocinador).length > 0
         ) {
+          console.log("🔵 [Transaction] Agregando datosPatrocinador");
           operations.push(
             tx.clienteDatosPatrocinador.create({
               data: {
@@ -385,6 +423,7 @@ export async function crearClienteCompleto(
           validated.datosViaje &&
           Object.keys(validated.datosViaje).length > 0
         ) {
+          console.log("🔵 [Transaction] Agregando datosViaje");
           operations.push(
             tx.clienteDatosViaje.create({
               data: {
@@ -396,7 +435,11 @@ export async function crearClienteCompleto(
         }
 
         if (operations.length > 0) {
+          console.log(
+            `🔵 [Transaction] Ejecutando ${operations.length} operaciones adicionales...`,
+          );
           await Promise.all(operations);
+          console.log("✅ [Transaction] Operaciones adicionales completadas");
         }
 
         return nuevoCliente.id;
@@ -407,12 +450,30 @@ export async function crearClienteCompleto(
       },
     );
 
+    console.log(
+      "✅ [crearClienteCompleto] Cliente creado exitosamente:",
+      clienteId,
+    );
+
     return {
       success: true,
       data: { id: clienteId },
     };
   } catch (error) {
+    console.error("❌ [crearClienteCompleto] ERROR CAPTURADO:", {
+      error,
+      errorType: error?.constructor?.name,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
     if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      console.error("❌ [crearClienteCompleto] Error Prisma:", {
+        code: error.code,
+        meta: error.meta,
+        clientVersion: error.clientVersion,
+      });
+
       if (error.code === "P2002") {
         const target = (error.meta?.target as string[]) || [];
         if (target.includes("numeroCi")) {
@@ -437,10 +498,211 @@ export async function crearClienteCompleto(
       }
     }
 
-    console.error("Error al crear cliente completo:", error);
     return {
       success: false,
       error: "Error al crear el cliente completo",
+    };
+  }
+}
+
+export async function actualizarClienteCompleto(
+  clienteId: string,
+  input: CreateClienteCompletoFormData,
+): Promise<ActionResult<{ id: string }>> {
+  console.log("🔵 [actualizarClienteCompleto] Inicio - Cliente ID:", clienteId);
+
+  try {
+    console.log("🔵 [actualizarClienteCompleto] Validando datos con Zod...");
+    const validated = createClienteCompletoSchema.parse(input);
+    console.log("✅ [actualizarClienteCompleto] Validación exitosa");
+
+    const clienteExiste = await db.cliente.findUnique({
+      where: { id: clienteId },
+    });
+
+    if (!clienteExiste) {
+      console.error("❌ [actualizarClienteCompleto] Cliente no encontrado");
+      return {
+        success: false,
+        error: "Cliente no encontrado",
+      };
+    }
+
+    if (validated.cliente.regionId !== clienteExiste.regionId) {
+      console.log(
+        "🔵 [actualizarClienteCompleto] Verificando nueva región:",
+        validated.cliente.regionId,
+      );
+      const regionExiste = await db.region.findUnique({
+        where: { id: validated.cliente.regionId },
+      });
+
+      if (!regionExiste) {
+        console.error("❌ [actualizarClienteCompleto] Región no encontrada");
+        return {
+          success: false,
+          error: "Región no encontrada",
+        };
+      }
+    }
+
+    console.log("🔵 [actualizarClienteCompleto] Iniciando transacción...");
+    await db.$transaction(
+      async (tx) => {
+        console.log("🔵 [Transaction] Actualizando cliente base...");
+        await tx.cliente.update({
+          where: { id: clienteId },
+          data: validated.cliente,
+        });
+        console.log("✅ [Transaction] Cliente actualizado");
+
+        if (
+          validated.datosPersonales &&
+          Object.keys(validated.datosPersonales).length > 0
+        ) {
+          console.log("🔵 [Transaction] Actualizando datosPersonales...");
+          await tx.clienteDatosPersonales.upsert({
+            where: { clienteId },
+            create: {
+              clienteId,
+              ...validated.datosPersonales,
+            },
+            update: validated.datosPersonales,
+          });
+        }
+
+        if (
+          validated.datosLaborales &&
+          Object.keys(validated.datosLaborales).length > 0
+        ) {
+          console.log("🔵 [Transaction] Actualizando datosLaborales...");
+          await tx.clienteDatosLaborales.upsert({
+            where: { clienteId },
+            create: {
+              clienteId,
+              ...validated.datosLaborales,
+            },
+            update: validated.datosLaborales,
+          });
+        }
+
+        if (
+          validated.datosAcademicos &&
+          Object.keys(validated.datosAcademicos).length > 0
+        ) {
+          console.log("🔵 [Transaction] Actualizando datosAcademicos...");
+          await tx.clienteDatosAcademicos.upsert({
+            where: { clienteId },
+            create: {
+              clienteId,
+              ...validated.datosAcademicos,
+            },
+            update: validated.datosAcademicos,
+          });
+        }
+
+        if (
+          validated.datosMatrimoniales &&
+          Object.keys(validated.datosMatrimoniales).length > 0
+        ) {
+          console.log("🔵 [Transaction] Actualizando datosMatrimoniales...");
+          await tx.clienteDatosMatrimoniales.upsert({
+            where: { clienteId },
+            create: {
+              clienteId,
+              ...validated.datosMatrimoniales,
+            },
+            update: validated.datosMatrimoniales,
+          });
+        }
+
+        if (
+          validated.datosPatrocinador &&
+          Object.keys(validated.datosPatrocinador).length > 0
+        ) {
+          console.log("🔵 [Transaction] Actualizando datosPatrocinador...");
+          await tx.clienteDatosPatrocinador.upsert({
+            where: { clienteId },
+            create: {
+              clienteId,
+              ...validated.datosPatrocinador,
+            },
+            update: validated.datosPatrocinador,
+          });
+        }
+
+        if (
+          validated.datosViaje &&
+          Object.keys(validated.datosViaje).length > 0
+        ) {
+          console.log("🔵 [Transaction] Actualizando datosViaje...");
+          await tx.clienteDatosViaje.upsert({
+            where: { clienteId },
+            create: {
+              clienteId,
+              ...validated.datosViaje,
+            },
+            update: validated.datosViaje,
+          });
+        }
+
+        console.log("✅ [Transaction] Todas las actualizaciones completadas");
+      },
+      {
+        maxWait: 10000,
+        timeout: 15000,
+      },
+    );
+
+    console.log(
+      "✅ [actualizarClienteCompleto] Cliente actualizado exitosamente",
+    );
+
+    return {
+      success: true,
+      data: { id: clienteId },
+    };
+  } catch (error) {
+    console.error("❌ [actualizarClienteCompleto] ERROR CAPTURADO:", {
+      error,
+      errorType: error?.constructor?.name,
+      errorMessage: error instanceof Error ? error.message : String(error),
+      stack: error instanceof Error ? error.stack : undefined,
+    });
+
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      console.error("❌ [actualizarClienteCompleto] Error Prisma:", {
+        code: error.code,
+        meta: error.meta,
+      });
+
+      if (error.code === "P2002") {
+        const target = (error.meta?.target as string[]) || [];
+        if (target.includes("numeroCi")) {
+          return {
+            success: false,
+            error: "Ya existe otro cliente con este número de CI",
+          };
+        }
+        if (target.includes("numeroPasaporte")) {
+          return {
+            success: false,
+            error: "Ya existe otro cliente con este número de pasaporte",
+          };
+        }
+      }
+      if (error.code === "P2028") {
+        return {
+          success: false,
+          error:
+            "La operación tardó demasiado tiempo. Por favor, intenta nuevamente.",
+        };
+      }
+    }
+
+    return {
+      success: false,
+      error: "Error al actualizar el cliente",
     };
   }
 }
@@ -661,6 +923,101 @@ export async function buscarClientes(
     return {
       success: false,
       error: "Error al buscar clientes",
+    };
+  }
+}
+
+export async function toggleClientesActivoEnLote(
+  clienteIds: string[],
+  nuevoEstado: boolean,
+): Promise<ActionResult<{ actualizados: number }>> {
+  console.log("🔵 [toggleClientesActivoEnLote] Inicio:", {
+    clienteIds,
+    nuevoEstado,
+    total: clienteIds.length,
+  });
+
+  try {
+    if (clienteIds.length === 0) {
+      return {
+        success: false,
+        error: "No se seleccionaron clientes",
+      };
+    }
+
+    const result = await db.cliente.updateMany({
+      where: {
+        id: {
+          in: clienteIds,
+        },
+      },
+      data: {
+        activo: nuevoEstado,
+      },
+    });
+
+    console.log(
+      "✅ [toggleClientesActivoEnLote] Clientes actualizados:",
+      result.count,
+    );
+
+    return {
+      success: true,
+      data: { actualizados: result.count },
+    };
+  } catch (error) {
+    console.error("❌ [toggleClientesActivoEnLote] Error:", error);
+    return {
+      success: false,
+      error: "Error al actualizar clientes en lote",
+    };
+  }
+}
+
+/**
+ * Elimina múltiples clientes en lote (soft delete)
+ */
+export async function eliminarClientesEnLote(
+  clienteIds: string[],
+): Promise<ActionResult<{ eliminados: number }>> {
+  console.log("🔵 [eliminarClientesEnLote] Inicio:", {
+    clienteIds,
+    total: clienteIds.length,
+  });
+
+  try {
+    if (clienteIds.length === 0) {
+      return {
+        success: false,
+        error: "No se seleccionaron clientes",
+      };
+    }
+
+    const result = await db.cliente.updateMany({
+      where: {
+        id: {
+          in: clienteIds,
+        },
+      },
+      data: {
+        deletedAt: new Date(),
+      },
+    });
+
+    console.log(
+      "✅ [eliminarClientesEnLote] Clientes eliminados:",
+      result.count,
+    );
+
+    return {
+      success: true,
+      data: { eliminados: result.count },
+    };
+  } catch (error) {
+    console.error("❌ [eliminarClientesEnLote] Error:", error);
+    return {
+      success: false,
+      error: "Error al eliminar clientes en lote",
     };
   }
 }
