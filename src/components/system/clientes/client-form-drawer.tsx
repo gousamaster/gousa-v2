@@ -22,6 +22,7 @@ import {
   obtenerClientePorId,
 } from "@/lib/actions/clientes/clientes-actions";
 import { descargarRespaldosCompletos } from "@/lib/utils/backup-utils";
+import { formatDateForInput } from "@/lib/utils/date-format-helper";
 import type { ClienteListItem } from "@/types/cliente-types";
 import {
   type CreateClienteCompletoFormData,
@@ -95,7 +96,7 @@ export function ClientFormDrawer({
                 nombres: data.nombres,
                 apellidos: data.apellidos,
                 tipoCliente: data.tipoCliente,
-                fechaNacimiento: data.fechaNacimiento || null,
+                fechaNacimiento: formatDateForInput(data.fechaNacimiento),
                 lugarNacimiento: data.lugarNacimiento || null,
                 nacionalidad: data.nacionalidad || null,
                 numeroCi: data.numeroCi || null,
@@ -105,12 +106,82 @@ export function ClientFormDrawer({
                 regionId: data.regionId,
                 registradoPorId: data.registradoPorId,
               },
-              datosPersonales: data.datosPersonales || {},
-              datosLaborales: data.datosLaborales || {},
-              datosAcademicos: data.datosAcademicos || {},
-              datosMatrimoniales: data.datosMatrimoniales || {},
-              datosPatrocinador: data.datosPatrocinador || {},
-              datosViaje: data.datosViaje || {},
+              datosPersonales: data.datosPersonales
+                ? {
+                    pasaporteFechaEmision: formatDateForInput(
+                      data.datosPersonales.pasaporteFechaEmision,
+                    ),
+                    pasaporteFechaExpiracion: formatDateForInput(
+                      data.datosPersonales.pasaporteFechaExpiracion,
+                    ),
+                    facebook: data.datosPersonales.facebook || null,
+                    instagram: data.datosPersonales.instagram || null,
+                    direccionDomicilio:
+                      data.datosPersonales.direccionDomicilio || null,
+                    estadoCivil: data.datosPersonales.estadoCivil || null,
+                    profesion: data.datosPersonales.profesion || null,
+                    nombrePadre: data.datosPersonales.nombrePadre || null,
+                    fechaNacimientoPadre: formatDateForInput(
+                      data.datosPersonales.fechaNacimientoPadre,
+                    ),
+                    nombreMadre: data.datosPersonales.nombreMadre || null,
+                    fechaNacimientoMadre: formatDateForInput(
+                      data.datosPersonales.fechaNacimientoMadre,
+                    ),
+                  }
+                : {},
+              datosLaborales: data.datosLaborales
+                ? {
+                    ...data.datosLaborales,
+                    fechaContratacion: formatDateForInput(
+                      data.datosLaborales.fechaContratacion,
+                    ),
+                    fechaInicioTrabajoAnterior: formatDateForInput(
+                      data.datosLaborales.fechaInicioTrabajoAnterior,
+                    ),
+                  }
+                : {},
+              datosAcademicos: data.datosAcademicos
+                ? {
+                    ...data.datosAcademicos,
+                    fechaInicioEstudio: formatDateForInput(
+                      data.datosAcademicos.fechaInicioEstudio,
+                    ),
+                    fechaFinEstudio: formatDateForInput(
+                      data.datosAcademicos.fechaFinEstudio,
+                    ),
+                  }
+                : {},
+              datosMatrimoniales: data.datosMatrimoniales
+                ? {
+                    ...data.datosMatrimoniales,
+                    conyugeFechaNacimiento: formatDateForInput(
+                      data.datosMatrimoniales.conyugeFechaNacimiento,
+                    ),
+                    matrimonioFechaInicio: formatDateForInput(
+                      data.datosMatrimoniales.matrimonioFechaInicio,
+                    ),
+                    matrimonioFechaFin: formatDateForInput(
+                      data.datosMatrimoniales.matrimonioFechaFin,
+                    ),
+                  }
+                : {},
+              datosPatrocinador: data.datosPatrocinador
+                ? {
+                    ...data.datosPatrocinador,
+                    fechaInicioTrabajoPatrocinador: formatDateForInput(
+                      data.datosPatrocinador.fechaInicioTrabajoPatrocinador,
+                    ),
+                  }
+                : {},
+              datosViaje: data.datosViaje
+                ? {
+                    ...data.datosViaje,
+                    fechaTentativa: formatDateForInput(
+                      data.datosViaje.fechaTentativa,
+                    ),
+                  }
+                : {},
             });
           }
         } catch (error) {
