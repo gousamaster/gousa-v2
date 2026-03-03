@@ -101,12 +101,7 @@ export const createClienteDatosLaboralesSchema = z.object({
   direccionTrabajo: z.string().max(1000).trim().optional().nullable(),
   telefonoTrabajo: z.string().max(50).trim().optional().nullable(),
   fechaContratacion: optionalDateSchema,
-  percepcionSalarial: z
-    .number()
-    .positive()
-    .max(9999999.99)
-    .optional()
-    .nullable(),
+  percepcionSalarial: z.number().min(-1).max(9999999.99).optional().nullable(),
   nombreTrabajoAnterior: z.string().max(255).trim().optional().nullable(),
   telefonoTrabajoAnterior: z.string().max(50).trim().optional().nullable(),
   direccionTrabajoAnterior: z.string().max(1000).trim().optional().nullable(),
