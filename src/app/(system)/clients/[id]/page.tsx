@@ -8,6 +8,8 @@ import { ClienteServiciosTab } from "@/components/system/tramites/cliente-servic
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { obtenerClientePorId } from "@/lib/actions/clientes/clientes-actions";
 import { auth } from "@/lib/auth";
+import Link from "next/link";
+import { Button } from "@/components/ui/button";
 
 interface ClientePerfilPageProps {
   params: Promise<{ id: string }>;
@@ -41,11 +43,17 @@ export default async function ClientePerfilPage({
           </p>
         </div>
 
-        <DescargaFichaButton
-          clienteId={cliente.id}
-          nombreCliente={`${cliente.nombres} ${cliente.apellidos}`}
-          tieneGrupoFamiliar={tieneGrupoFamiliar}
-        />
+        <div className="flex items-center gap-2">
+          <Button asChild variant="outline" size="sm">
+            <Link href={`/clientes/${cliente.id}/nexus`}>GO USA NEXUS</Link>
+          </Button>
+
+          <DescargaFichaButton
+            clienteId={cliente.id}
+            nombreCliente={`${cliente.nombres} ${cliente.apellidos}`}
+            tieneGrupoFamiliar={tieneGrupoFamiliar}
+          />
+        </div>
       </div>
 
       <Tabs defaultValue="servicios">
