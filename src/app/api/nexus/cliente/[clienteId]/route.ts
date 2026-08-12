@@ -7,9 +7,9 @@ import { NexusResponse } from "@/types/nexus";
 // Read-only API: GET /api/nexus/cliente/[clienteId]
 export async function GET(
   request: Request,
-  { params }: { params: { clienteId: string } }
+  { params }: { params: Promise<{ clienteId: string }> }
 ) {
-  const { clienteId } = params;
+  const { clienteId } = await params;
 
   // Fetch cliente base
   const cliente = await db.cliente.findUnique({
