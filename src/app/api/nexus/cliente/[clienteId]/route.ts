@@ -69,12 +69,15 @@ export async function GET(
   }
 
   // Historial Tramite
-  const historial = await db.tramiteHistorial.findMany({
-    where: { tramiteId: tramiteSeleccionado ? tramiteSeleccionado.id : undefined },
-    include: { usuario: { select: { id: true, name: true } }, estado: { select: { id: true, nombre: true } } },
-    orderBy: { createdAt: "desc" },
-    take: 50,
-  });
+  let historial = [];
+  if (tramiteSeleccionado) {
+    historial = await db.tramiteHistorial.findMany({
+      where: { tramiteId: tramiteSeleccionado.id },
+      include: { usuario: { select: { id: true, name: true } }, estado: { select: { id: true, nombre: true } } },
+      orderBy: { createdAt: "desc" },
+      take: 50,
+    });
+  }
 
   const response: NexusResponse = {
     meta: {
