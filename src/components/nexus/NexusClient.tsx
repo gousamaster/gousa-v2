@@ -237,8 +237,23 @@ export default function NexusClient({
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {MOTOR_ORDER.map((key) => {
-            const score =
-              data.score.motores[key];
+            const motor =
+  data.score.motores[key];
+
+const isCredibilidad =
+  key === "CREDIBILIDAD_COHERENCIA";
+
+const score =
+  isCredibilidad
+    ? data.score.motores
+        .CREDIBILIDAD_COHERENCIA.score
+    : (motor as number | null);
+
+const detail =
+  isCredibilidad
+    ? data.score.motores
+        .CREDIBILIDAD_COHERENCIA
+    : null;
 
             return (
               <div
@@ -256,10 +271,72 @@ export default function NexusClient({
                 </div>
 
                 <div className="mt-1 text-xs text-muted-foreground">
-                  {score != null
-                    ? "Evaluación preliminar disponible"
-                    : "Información insuficiente para evaluar"}
-                </div>
+  {score != null
+    ? "Evaluación preliminar disponible"
+    : "Información insuficiente para evaluar"}
+</div>
+
+{detail && (
+  <div className="mt-3 space-y-3 border-t pt-3">
+    <div className="text-xs text-muted-foreground">
+      Cobertura: {detail.coverage}%
+    </div>
+
+    {detail.strengths.length > 0 && (
+      <div>
+        <div className="text-xs font-semibold">
+          Fortalezas
+        </div>
+
+        <ul className="mt-1 list-disc space-y-1 pl-4 text-xs">
+          {detail.strengths.map(
+            (item, index) => (
+              <li key={`strength-${index}`}>
+                {item}
+              </li>
+            )
+          )}
+        </ul>
+      </div>
+    )}
+
+    {detail.observations.length > 0 && (
+      <div>
+        <div className="text-xs font-semibold">
+          Observaciones
+        </div>
+
+        <ul className="mt-1 list-disc space-y-1 pl-4 text-xs">
+          {detail.observations.map(
+            (item, index) => (
+              <li key={`observation-${index}`}>
+                {item}
+              </li>
+            )
+          )}
+        </ul>
+      </div>
+    )}
+
+    {detail.missingData.length > 0 && (
+      <div>
+        <div className="text-xs font-semibold">
+          Datos por completar
+        </div>
+
+        <ul className="mt-1 list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+          {detail.missingData.map(
+            (item, index) => (
+              <li key={`missing-${index}`}>
+                {item}
+              </li>
+            )
+          )}
+        </ul>
+      </div>
+    )}
+  </div>
+)}
               </div>
             );
           })}
