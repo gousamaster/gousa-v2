@@ -103,7 +103,13 @@ export interface HistorialItem {
   estado: string | null;
   observacion?: string | null;
 }
-
+export interface NexusMotorDetail {
+  score: number | null;
+  coverage: number;
+  strengths: string[];
+  observations: string[];
+  missingData: string[];
+}
 export interface NexusResponse {
   meta: NexusMeta;
   cliente: ClienteSummary;
@@ -112,7 +118,19 @@ export interface NexusResponse {
   viaje: ViajeSummary;
   score: {
     total: number | null;
-    motores: Record<NexusMotorKey, number | null>;
+  motores: {
+  ARRAIGO: number | null;
+
+  CREDIBILIDAD_COHERENCIA: NexusMotorDetail;
+
+  MOTIVO_VIAJE: number | null;
+
+  PERFIL_LABORAL_ECONOMICO: number | null;
+
+  ENTORNO_FAMILIAR_RIESGO_MIGRATORIO:
+    number | null;
+
+  HISTORIAL_MIGRATORIO: number | null;
   };
   citas: {
     proximaEntrevista: CitaSummary | null;
