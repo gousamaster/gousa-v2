@@ -290,19 +290,22 @@ export async function GET(
           : null,
 
       viaje: cliente.datosViaje
-        ? {
-            motivo:
-              cliente.datosViaje.motivo,
-            lugar:
-              cliente.datosViaje.lugar,
-            fechaTentativa:
-              cliente.datosViaje
-                .fechaTentativa,
-            tiempoEstadia:
-              cliente.datosViaje
-                .tiempoEstadia,
-          }
-        : null,
+  ? {
+      motivo:
+        cliente.datosViaje.motivo,
+      lugar:
+        cliente.datosViaje.lugar,
+      fechaTentativa:
+        cliente.datosViaje
+          .fechaTentativa,
+      tiempoEstadia:
+        cliente.datosViaje
+          .tiempoEstadia,
+      paisesVisitados:
+        cliente.datosViaje
+          .paisesVisitados,
+    }
+  : null,
 
       grupoFamiliarCount:
         cliente.gruposFamiliares.length,
