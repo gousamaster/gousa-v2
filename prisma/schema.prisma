@@ -590,7 +590,6 @@ cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Casca
 @@index([clienteId])
 @@map("cliente_datos_migratorios")
 }
-}
 // ============================================
 // SERVICIOS CONTRATADOS
 // ============================================
