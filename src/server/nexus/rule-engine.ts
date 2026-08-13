@@ -350,6 +350,456 @@ function evaluateMotivo(
 
   return result;
 }
+function evaluateCredibilidadCoherencia(
+  input: NexusRuleInput
+): NexusMotorEvaluation {
+  const result = emptyMotor(
+    "CREDIBILIDAD_COHERENCIA"
+  );
+
+  let earned = 0;
+  let availableSignals = 0;
+  const totalSignals = 11;
+
+  const viaje = input.viaje;
+  const laboral = input.laboral;
+  const patrocinador = input.patrocinador;
+  const migratorio = input.migratorio;
+
+  // ==========================================
+  // 1. COHERENCIA DEL VIAJE — hasta 5 pts
+  // ==========================================
+
+  if (viaje?.motivo) {
+    availableSignals += 1;
+    earned += 1.5;
+
+    result.strengths.push(
+      "motivo de viaje registrado"
+    );
+  } else {
+    result.missingData.push(
+      "motivo de viaje"
+    );
+  }
+
+  if (viaje?.lugar) {
+    availableSignals += 1;
+    earned += 1;
+
+    result.strengths.push(
+      "destino del viaje identificado"
+    );
+  } else {
+    result.missingData.push(
+      "destino del viaje"
+    );
+  }
+
+  if (viaje?.tiempoEstadia) {
+    availableSignals += 1;
+    earned += 1.5;
+
+    result.strengths.push(
+      "duración de estadía registrada"
+    );
+  } else {
+    result.missingData.push(
+      "duración de estadía"
+    );
+  }
+
+  if (viaje?.fechaTentativa) {
+    availableSignals += 1;
+    earned += 1;
+
+    result.strengths.push(
+      "fecha tentativa del viaje registrada"
+    );
+  } else {
+    result.missingData.push(
+      "fecha tentativa del viaje"
+    );
+  }
+
+  // ==========================================
+  // 2. COHERENCIA ECONÓMICA — hasta 5 pts
+  // ==========================================
+
+  if (
+    laboral?.percepcionSalarial != null &&
+    laboral.percepcionSalarial > 0
+  ) {
+    availableSignals += 1;
+
+    if (laboral.percepcionSalarial >= 12000) {
+      earned += 3;
+
+      result.strengths.push(
+        "ingreso declarado con capacidad económica favorable"
+      );
+    } else if (
+      laboral.percepcionSalarial >= 8000
+    ) {
+      earned += 2;
+
+      result.observations.push(
+        "capacidad económica moderada para contrastar con el viaje"
+      );
+    } else {
+      earned += 1;
+
+      result.observations.push(
+        "capacidad económica declarada limitada; requiere revisar costo y características del viaje"
+      );
+    }
+  } else {
+    result.missingData.push(
+      "ingreso económico para contrastar con el viaje"
+    );
+  }
+
+  if (patrocinador?.nombrePatrocinador) {
+    availableSignals += 1;
+
+    const patrocinadorConContexto =
+      Boolean(
+        patrocinador.trabajoPatrocinador
+      ) ||
+      patrocinador
+        .percepcionSalarialPatrocinador != null;
+
+    if (patrocinadorConContexto) {
+      earned += 2;
+
+      result.strengths.push(
+        "patrocinador identificado con contexto económico"
+      );
+    } else {
+      earned += 0.75;
+
+      result.observations.push(
+        "patrocinador registrado sin suficiente contexto económico"
+      );
+
+      result.missingData.push(
+        "capacidad económica del patrocinador"
+      );
+    }
+  } else if (
+    laboral?.percepcionSalarial != null
+  ) {
+    /*
+     * No tener patrocinador no es negativo
+     * cuando existe capacidad económica propia.
+     */
+    availableSignals += 1;
+    earned += 2;
+
+    result.strengths.push(
+      "viaje respaldado por capacidad económica propia registrada"
+    );
+  } else {
+    result.missingData.push(
+      "fuente de financiamiento del viaje"
+    );
+  }
+
+  // ==========================================
+  // 3. COHERENCIA LABORAL — hasta 4 pts
+  // ==========================================
+
+  if (
+    laboral?.lugarTrabajo ||
+    laboral?.cargoTrabajo ||
+    laboral?.descripcionTrabajo
+  ) {
+    availableSignals += 1;
+    earned += 2;
+
+    result.strengths.push(
+      "actividad laboral identificada"
+    );
+  } else {
+    result.missingData.push(
+      "actividad laboral"
+    );
+  }
+
+  if (laboral?.fechaContratacion) {
+    availableSignals += 1;
+
+    const antiguedad =
+      yearsSince(
+        laboral.fechaContratacion
+      );
+
+    if (antiguedad != null) {
+      if (antiguedad >= 3) {
+        earned += 2;
+
+        result.strengths.push(
+          "trayectoria laboral consistente"
+        );
+      } else if (antiguedad >= 1) {
+        earned += 1.25;
+
+        result.observations.push(
+          "antigüedad laboral moderada"
+        );
+      } else {
+        earned += 0.5;
+
+        result.observations.push(
+          "empleo reciente; requiere contrastar estabilidad con el viaje"
+        );
+      }
+    }
+  } else {
+    result.missingData.push(
+      "antigüedad laboral"
+    );
+  }
+
+  // ==========================================
+  // 4. COHERENCIA MIGRATORIA — hasta 4 pts
+  // ==========================================
+
+  if (migratorio) {
+    const señalesGravesConocidas = [
+      migratorio.tuvoSobreestadia,
+      migratorio.trabajoNoAutorizadoUsa,
+      migratorio.tuvoEntradaRechazadaUsa,
+      migratorio.tuvoProblemaCbP,
+      migratorio.tuvoDeportacionRemocion,
+    ];
+
+    const señalesInformadas =
+      señalesGravesConocidas.filter(
+        (value) =>
+          value !== null &&
+          value !== undefined
+      );
+
+    if (señalesInformadas.length > 0) {
+      availableSignals += 1;
+
+      const tieneIncidenciaGrave =
+        señalesInformadas.some(
+          (value) => value === true
+        );
+
+      if (!tieneIncidenciaGrave) {
+        earned += 3;
+
+        result.strengths.push(
+          "antecedentes migratorios informados sin incidencias graves registradas"
+        );
+      } else {
+        earned += 0.5;
+
+        result.observations.push(
+          "existen antecedentes migratorios que requieren contraste detallado"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "antecedentes migratorios suficientes para contrastar coherencia"
+      );
+    }
+
+    if (
+      migratorio.tuvoVisaUsaAntes !== null &&
+      migratorio.tuvoVisaUsaAntes !== undefined
+    ) {
+      availableSignals += 1;
+
+      if (
+        migratorio.tuvoVisaUsaAntes &&
+        migratorio.tipoVisaUsaAnterior
+      ) {
+        earned += 1;
+
+        result.strengths.push(
+          "antecedente de visa estadounidense con tipo identificado"
+        );
+      } else if (
+        migratorio.tuvoVisaUsaAntes
+      ) {
+        earned += 0.5;
+
+        result.missingData.push(
+          "tipo de visa estadounidense anterior"
+        );
+      } else {
+        earned += 1;
+
+        result.observations.push(
+          "solicitante sin visa estadounidense previa"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "antecedente de visa estadounidense"
+      );
+    }
+  } else {
+    result.missingData.push(
+      "historial migratorio estructurado"
+    );
+  }
+  // ==========================================
+  // 5. CONSISTENCIA TRANSVERSAL — hasta 2 pts
+  // ==========================================
+
+  if (migratorio) {
+    const contradicciones: string[] = [];
+    let verificacionesDisponibles = 0;
+
+    // Dice no haber tenido visa USA,
+    // pero existe un tipo de visa registrado.
+    if (
+      migratorio.tuvoVisaUsaAntes !== null &&
+      migratorio.tuvoVisaUsaAntes !== undefined &&
+      migratorio.tipoVisaUsaAnterior
+    ) {
+      verificacionesDisponibles += 1;
+
+      if (!migratorio.tuvoVisaUsaAntes) {
+        contradicciones.push(
+          "se registra tipo de visa anterior aunque se declaró no haber tenido visa estadounidense"
+        );
+      }
+    }
+
+    // Dice no haber viajado a USA,
+    // pero registra cantidad positiva de viajes.
+    if (
+      migratorio.viajoUsaAntes !== null &&
+      migratorio.viajoUsaAntes !== undefined &&
+      migratorio.cantidadViajesUsa != null
+    ) {
+      verificacionesDisponibles += 1;
+
+      if (
+        !migratorio.viajoUsaAntes &&
+        migratorio.cantidadViajesUsa > 0
+      ) {
+        contradicciones.push(
+          "se registran viajes a Estados Unidos aunque se declaró no haber ingresado anteriormente"
+        );
+      }
+    }
+
+    // Dice no haber tenido sobreestadía,
+    // pero registra días de sobreestadía.
+    if (
+      migratorio.tuvoSobreestadia !== null &&
+      migratorio.tuvoSobreestadia !== undefined &&
+      migratorio.diasSobreestadia != null
+    ) {
+      verificacionesDisponibles += 1;
+
+      if (
+        !migratorio.tuvoSobreestadia &&
+        migratorio.diasSobreestadia > 0
+      ) {
+        contradicciones.push(
+          "se registran días de sobreestadía aunque se declaró no haber tenido sobreestadía"
+        );
+      }
+    }
+
+    // No puede afirmar cumplimiento permanente
+    // y simultáneamente declarar una sobreestadía.
+    if (
+      migratorio.cumplioSiempreTiempoAutorizado !==
+        null &&
+      migratorio.cumplioSiempreTiempoAutorizado !==
+        undefined &&
+      migratorio.tuvoSobreestadia !== null &&
+      migratorio.tuvoSobreestadia !== undefined
+    ) {
+      verificacionesDisponibles += 1;
+
+      if (
+        migratorio.cumplioSiempreTiempoAutorizado ===
+          true &&
+        migratorio.tuvoSobreestadia === true
+      ) {
+        contradicciones.push(
+          "se declaró cumplimiento permanente del tiempo autorizado y también una sobreestadía"
+        );
+      }
+    }
+
+    if (verificacionesDisponibles > 0) {
+      availableSignals += 1;
+
+      if (contradicciones.length === 0) {
+        earned += 2;
+
+        result.strengths.push(
+          "sin contradicciones internas detectadas en los antecedentes migratorios registrados"
+        );
+      } else {
+        result.observations.push(
+          ...contradicciones
+        );
+      }
+    } else {
+      result.missingData.push(
+        "datos suficientes para contrastar consistencia interna"
+      );
+    }
+  } else {
+    result.missingData.push(
+      "datos migratorios para contrastar consistencia interna"
+    );
+  }
+  // ==========================================
+  // COBERTURA Y PUNTAJE FINAL
+  // ==========================================
+
+  result.coverage = Math.round(
+    (availableSignals / totalSignals) * 100
+  );
+
+  if (availableSignals === 0) {
+    result.score = null;
+
+    return result;
+  }
+
+  /*
+   * Igual que en Historial Migratorio:
+   * lo faltante no resta,
+   * pero tampoco genera puntos artificiales.
+   */
+  result.score = Math.max(
+    0,
+    Math.min(
+      result.max,
+      Math.round(earned * 10) / 10
+    )
+  );
+
+  if (result.coverage < 40) {
+    result.observations.push(
+      "evaluación preliminar de coherencia basada en información parcial"
+    );
+  } else if (result.coverage < 80) {
+    result.observations.push(
+      "coherencia parcialmente evaluable; existen datos relevantes por completar"
+    );
+  } else {
+    result.strengths.push(
+      "buena cobertura de información para contrastar coherencia"
+    );
+  }
+
+  return result;
+}
 function evaluateHistorialMigratorio(
   input: NexusRuleInput
 ): NexusMotorEvaluation {
@@ -947,19 +1397,17 @@ export function evaluateNexusScore(
   motores.MOTIVO_VIAJE =
     evaluateMotivo(input);
 
-  motores.CREDIBILIDAD_COHERENCIA
-    .missingData.push(
-      "formularios o antecedentes suficientes para contrastar coherencia"
-    );
+motores.CREDIBILIDAD_COHERENCIA =
+  evaluateCredibilidadCoherencia(input);
 
-  motores.ENTORNO_FAMILIAR_RIESGO_MIGRATORIO
-    .missingData.push(
-      "estatus y contexto migratorio de familiares en Estados Unidos"
-    );
+motores.ENTORNO_FAMILIAR_RIESGO_MIGRATORIO
+  .missingData.push(
+    "estatus y contexto migratorio de familiares en Estados Unidos"
+  );
 
-  motores.HISTORIAL_MIGRATORIO =
+motores.HISTORIAL_MIGRATORIO =
   evaluateHistorialMigratorio(input);
-
+  
   const evaluated = MOTOR_KEYS
     .map((key) => motores[key])
     .filter(
