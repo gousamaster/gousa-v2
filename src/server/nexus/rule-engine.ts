@@ -285,66 +285,146 @@ function evaluateMotivo(
     result.missingData.push(
       "datos del viaje"
     );
+
     return result;
   }
 
-  const signals = [
-    viaje.motivo,
-    viaje.lugar,
-    viaje.fechaTentativa,
-    viaje.tiempoEstadia,
-  ];
+  let earned = 0;
+  let availableSignals = 0;
+  const totalSignals = 4;
 
-  const available =
-    signals.filter(Boolean).length;
+  // ==========================================
+  // 1. MOTIVO DEL VIAJE — hasta 6 pts
+  // ==========================================
 
-  result.coverage = Math.round(
-    (available / signals.length) * 100
-  );
+  if (viaje.motivo?.trim()) {
+    availableSignals += 1;
 
-  if (!viaje.motivo) {
+    const motivo =
+      viaje.motivo.trim();
+
+    if (motivo.length >= 8) {
+      earned += 6;
+
+      result.strengths.push(
+        "motivo de viaje claramente identificado"
+      );
+    } else {
+      earned += 3;
+
+      result.observations.push(
+        "motivo de viaje registrado pero todavía poco desarrollado"
+      );
+    }
+  } else {
     result.missingData.push(
       "motivo del viaje"
     );
   }
 
-  if (!viaje.lugar) {
-    result.missingData.push("destino");
-  }
+  // ==========================================
+  // 2. DESTINO — hasta 3 pts
+  // ==========================================
 
-  if (!viaje.fechaTentativa) {
+  if (viaje.lugar?.trim()) {
+    availableSignals += 1;
+    earned += 3;
+
+    result.strengths.push(
+      "destino del viaje definido"
+    );
+  } else {
     result.missingData.push(
-      "fecha tentativa"
+      "destino del viaje"
     );
   }
 
-  if (!viaje.tiempoEstadia) {
+  // ==========================================
+  // 3. DURACIÓN — hasta 3 pts
+  // ==========================================
+
+  if (viaje.tiempoEstadia?.trim()) {
+    availableSignals += 1;
+    earned += 3;
+
+    result.strengths.push(
+      "duración de estadía registrada"
+    );
+  } else {
     result.missingData.push(
       "duración de estadía"
     );
   }
 
-  if (available === 0) {
+  // ==========================================
+  // 4. FECHA TENTATIVA — hasta 3 pts
+  // ==========================================
+
+  if (viaje.fechaTentativa) {
+    availableSignals += 1;
+    earned += 3;
+
+    result.strengths.push(
+      "fecha tentativa del viaje registrada"
+    );
+  } else {
+    result.missingData.push(
+      "fecha tentativa del viaje"
+    );
+  }
+
+  // ==========================================
+  // COBERTURA
+  // ==========================================
+
+  result.coverage = Math.round(
+    (availableSignals / totalSignals) * 100
+  );
+
+  if (availableSignals === 0) {
+    result.score = null;
+
     return result;
   }
 
-  // En v1 solo medimos completitud.
-  // No inferimos intención migratoria
-  // a partir de texto libre.
-  result.score =
-    Math.round(
-      (available / signals.length) *
-        result.max *
-        10
-    ) / 10;
+  /*
+   * El motivo es la señal central de este motor.
+   * Si todavía no existe motivo, NEXUS puede
+   * reconocer que hay otros datos del viaje,
+   * pero no debe publicar una valoración fuerte.
+   */
+  if (!viaje.motivo?.trim()) {
+    result.score = Math.min(
+      earned,
+      6
+    );
 
-  if (available === signals.length) {
-    result.strengths.push(
-      "motivo, destino, fecha y duración registrados"
+    result.observations.push(
+      "el expediente necesita un motivo de viaje antes de poder evaluar adecuadamente este motor"
+    );
+
+    return result;
+  }
+
+  result.score = Math.max(
+    0,
+    Math.min(
+      result.max,
+      Math.round(earned * 10) / 10
+    )
+  );
+
+  if (result.coverage < 50) {
+    result.observations.push(
+      "evaluación preliminar del motivo basada en información parcial"
+    );
+  } else if (result.coverage < 100) {
+    result.observations.push(
+      "motivo de viaje parcialmente estructurado; aún existen datos por completar"
     );
   } else {
-    result.observations.push(
-      "viaje todavía incompleto para una evaluación consular profunda"
+    result.strengths.push(
+      "viaje estructurado con motivo, destino, duración y fecha"
     );
   }
 
