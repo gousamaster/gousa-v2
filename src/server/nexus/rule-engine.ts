@@ -742,34 +742,79 @@ function evaluateHistorialMigratorio(
 
   // Evitamos publicar una valoración migratoria
   // con información demasiado fragmentaria.
-  if (
-    availableWeight === 0 ||
-    result.coverage < 45
-  ) {
+   // ==========================================
+  // PUNTAJE FINAL — CALIBRACIÓN NEXUS
+  // ==========================================
+
+  if (availableWeight === 0) {
     result.score = null;
 
     result.observations.push(
-      "historial migratorio todavía insuficiente para emitir puntaje"
+      "historial migratorio todavía sin información evaluable"
     );
 
     return result;
   }
 
-  // Normalizamos solamente con la información
-  // disponible. Lo faltante NO equivale a cero.
-  const normalized =
-    (earned / availableWeight) *
-    result.max;
+  /*
+   * NEXUS no convierte automáticamente una ficha
+   * incompleta en 15/15.
+   *
+   * earned representa únicamente los puntos que
+   * realmente pudieron demostrarse con la información
+   * disponible.
+   *
+   * Los datos faltantes:
+   * - NO restan puntos;
+   * - NO se consideran respuestas negativas;
+   * - pero tampoco generan puntos artificiales.
+   */
+
+  let finalScore = earned;
+
+  // Bonificación solo con buena cobertura y calidad
+  if (result.coverage >= 80) {
+    const quality =
+      availableWeight > 0
+        ? earned / availableWeight
+        : 0;
+
+    if (quality >= 0.95) {
+      finalScore += 1;
+    } else if (quality >= 0.85) {
+      finalScore += 0.5;
+    }
+  }
+
+  // 15/15 queda reservado para expedientes
+  // prácticamente completos y excepcionalmente sólidos.
+  if (
+    result.coverage < 90 &&
+    finalScore >= 15
+  ) {
+    finalScore = 14;
+  }
 
   result.score = Math.max(
     0,
     Math.min(
       result.max,
-      Math.round(normalized * 10) / 10
+      Math.round(finalScore * 10) / 10
     )
   );
 
-  return result;
+  if (result.coverage < 45) {
+    result.observations.push(
+      "evaluación preliminar basada en información migratoria parcial"
+    );
+  } else if (result.coverage < 80) {
+    result.observations.push(
+      "evaluación migratoria disponible; aún existen antecedentes por completar"
+    );
+  } else {
+    result.strengths.push(
+      "historial migratorio con buena cobertura de información"
+    );
 }
 function evaluateArraigo(
   input: NexusRuleInput
