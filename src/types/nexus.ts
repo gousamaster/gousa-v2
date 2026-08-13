@@ -130,8 +130,10 @@ export interface NexusResponse {
   ENTORNO_FAMILIAR_RIESGO_MIGRATORIO:
     number | null;
 
-  HISTORIAL_MIGRATORIO: number | null;
+    HISTORIAL_MIGRATORIO: number | null;
+    };
   };
+
   citas: {
     proximaEntrevista: CitaSummary | null;
     simulacro: CitaSummary | null;
