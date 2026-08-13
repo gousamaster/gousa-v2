@@ -328,10 +328,10 @@ function evaluateHistorialMigratorio(
     "HISTORIAL_MIGRATORIO"
   );
 
-  const paisesVisitados =
+  const paisesTexto =
     input.viaje?.paisesVisitados?.trim();
 
-  if (!paisesVisitados) {
+  if (!paisesTexto) {
     result.missingData.push(
       "historial de viajes internacionales"
     );
@@ -343,15 +343,55 @@ function evaluateHistorialMigratorio(
     return result;
   }
 
-  result.coverage = 25;
-  result.score = 8;
+  // Acepta países separados por:
+  // coma, punto y coma o salto de línea.
+  const paises = paisesTexto
+    .split(/[,;\n]+/)
+    .map((pais) =>
+      pais.trim().toLowerCase()
+    )
+    .filter(Boolean);
+
+  // Evita contar repetidos.
+  const paisesUnicos =
+    Array.from(new Set(paises));
+
+  const cantidad =
+    paisesUnicos.length;
+
+  let scoreViajes = 0;
+
+  if (cantidad >= 6) {
+    scoreViajes = 10;
+  } else if (cantidad >= 4) {
+    scoreViajes = 9;
+  } else if (cantidad >= 2) {
+    scoreViajes = 7;
+  } else if (cantidad === 1) {
+    scoreViajes = 5;
+  }
+
+  result.coverage = 40;
+  result.score = scoreViajes;
 
   result.strengths.push(
-    "historial de viajes internacionales registrado"
+    `${cantidad} país${
+      cantidad === 1 ? "" : "es"
+    } visitado${
+      cantidad === 1 ? "" : "s"
+    } registrado${
+      cantidad === 1 ? "" : "s"
+    }`
   );
 
+  if (cantidad >= 4) {
+    result.strengths.push(
+      "historial internacional diversificado"
+    );
+  }
+
   result.observations.push(
-    "evaluación preliminar: aún falta conocer visas anteriores, rechazos, entradas, salidas y cumplimiento migratorio"
+    "el puntaje actual evalúa únicamente historial internacional registrado"
   );
 
   result.missingData.push(
@@ -364,6 +404,10 @@ function evaluateHistorialMigratorio(
 
   result.missingData.push(
     "rechazos o antecedentes migratorios"
+  );
+
+  result.missingData.push(
+    "cumplimiento de condiciones migratorias en Estados Unidos"
   );
 
   return result;
