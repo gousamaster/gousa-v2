@@ -377,7 +377,7 @@ model Cliente {
   datosAcademicos     ClienteDatosAcademicos?
   datosMatrimoniales  ClienteDatosMatrimoniales?
   datosPatrocinador   ClienteDatosPatrocinador?
-  
+  datosMigratorios    ClienteDatosMigratorios?
   servicios           ClienteServicio[]
   tramites            Tramite[]
   gruposFamiliares    GrupoFamiliarMiembro[]
@@ -519,7 +519,81 @@ model ClienteDatosViaje {
   @@index([clienteId])
   @@map("cliente_datos_viaje")
 }
+/// Historial y antecedentes migratorios del cliente
+/// Boolean? = true / false / null(no informado)
+model ClienteDatosMigratorios {
+  id        String @id @default(cuid())
+  clienteId String @unique
 
+  // VISA ESTADOUNIDENSE PREVIA
+  tuvoVisaUsaAntes                Boolean?
+  tipoVisaUsaAnterior             String?
+  numeroVisaAnterior              String?
+  fechaEmisionVisaUsa             DateTime?
+  fechaVencimientoVisaUsa         DateTime?
+  visaRevocadaCancelada           Boolean?
+  detalleRevocacionCancelacion    String?
+
+  // VIAJES PREVIOS A ESTADOS UNIDOS
+  viajoUsaAntes                   Boolean?
+  cantidadViajesUsa               Int?
+  ultimoIngresoUsa                DateTime?
+  ultimaSalidaUsa                 DateTime?
+  duracionUltimaEstadiaDias       Int?
+  cumplioSiempreTiempoAutorizado  Boolean?
+
+  // SOBREESTADÍA / TRABAJO NO AUTORIZADO
+  tuvoSobreestadia                Boolean?
+  diasSobreestadia                Int?
+  detalleSobreestadia             String?
+  trabajoNoAutorizadoUsa          Boolean?
+  detalleTrabajoNoAutorizado      String?
+
+  // RECHAZOS DE VISA
+  tuvoRechazoVisaUsa              Boolean?
+  cantidadRechazosVisaUsa         Int?
+  fechaUltimoRechazoVisa          DateTime?
+  tipoVisaUltimoRechazo           String?
+  motivoRechazoConocido           String?
+
+  // FRONTERA / CBP / INGRESO
+  tuvoEntradaRechazadaUsa         Boolean?
+  fechaEntradaRechazada           DateTime?
+  detalleEntradaRechazada         String?
+  tuvoProblemaCbP                 Boolean?
+  detalleProblemaCbP              String?
+
+  // DEPORTACIÓN / REMOCIÓN
+  tuvoDeportacionRemocion         Boolean?
+  fechaDeportacionRemocion        DateTime?
+  detalleDeportacionRemocion      String?
+
+  // PETICIONES O PROCESOS MIGRATORIOS
+  tuvoPeticionMigratoriaUsa       Boolean?
+  tipoPeticionMigratoria          String?
+  estadoPeticionMigratoria        String?
+  detallePeticionMigratoria       String?
+  solicitoResidenciaUsa           Boolean?
+  solicitoAsiloUsa                Boolean?
+  solicitoCambioEstatusUsa        Boolean?
+
+  // OTROS ANTECEDENTES
+  tuvoOtroAntecedenteMigratorio   Boolean?
+  detalleOtroAntecedenteMigratorio String?
+  observacionesMigratorias        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cliente Cliente @relation(
+    fields: [clienteId],
+    references: [id],
+    onDelete: Cascade
+  )
+
+  @@index([clienteId])
+  @@map("cliente_datos_migratorios")
+}
 // ============================================
 // SERVICIOS CONTRATADOS
 // ============================================
