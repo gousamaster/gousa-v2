@@ -163,6 +163,7 @@ export async function obtenerClientePorId(
         datosMatrimoniales: true,
         datosPatrocinador: true,
         datosViaje: true,
+        datosMigratorios: true,
         gruposFamiliares: true,
       },
     });
@@ -197,6 +198,8 @@ export async function obtenerClientePorId(
           }
         : undefined,
       datosViaje: cliente.datosViaje ?? undefined,
+      datosMigratorios:
+  cliente.datosMigratorios ?? undefined,
     };
 
     return {
