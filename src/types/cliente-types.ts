@@ -112,7 +112,70 @@ export interface ClienteDatosViaje {
   createdAt: Date;
   updatedAt: Date;
 }
+export interface ClienteDatosMigratorios {
+  id: string;
+  clienteId: string;
 
+  // Visa estadounidense previa
+  tuvoVisaUsaAntes: boolean | null;
+  tipoVisaUsaAnterior: string | null;
+  numeroVisaAnterior: string | null;
+  fechaEmisionVisaUsa: Date | null;
+  fechaVencimientoVisaUsa: Date | null;
+  visaRevocadaCancelada: boolean | null;
+  detalleRevocacionCancelacion: string | null;
+
+  // Viajes previos a Estados Unidos
+  viajoUsaAntes: boolean | null;
+  cantidadViajesUsa: number | null;
+  ultimoIngresoUsa: Date | null;
+  ultimaSalidaUsa: Date | null;
+  duracionUltimaEstadiaDias: number | null;
+  cumplioSiempreTiempoAutorizado: boolean | null;
+
+  // Sobreestadía / trabajo no autorizado
+  tuvoSobreestadia: boolean | null;
+  diasSobreestadia: number | null;
+  detalleSobreestadia: string | null;
+  trabajoNoAutorizadoUsa: boolean | null;
+  detalleTrabajoNoAutorizado: string | null;
+
+  // Rechazos de visa
+  tuvoRechazoVisaUsa: boolean | null;
+  cantidadRechazosVisaUsa: number | null;
+  fechaUltimoRechazoVisa: Date | null;
+  tipoVisaUltimoRechazo: string | null;
+  motivoRechazoConocido: string | null;
+
+  // Frontera / CBP / ingreso
+  tuvoEntradaRechazadaUsa: boolean | null;
+  fechaEntradaRechazada: Date | null;
+  detalleEntradaRechazada: string | null;
+  tuvoProblemaCbP: boolean | null;
+  detalleProblemaCbP: string | null;
+
+  // Deportación / remoción
+  tuvoDeportacionRemocion: boolean | null;
+  fechaDeportacionRemocion: Date | null;
+  detalleDeportacionRemocion: string | null;
+
+  // Peticiones o procesos migratorios
+  tuvoPeticionMigratoriaUsa: boolean | null;
+  tipoPeticionMigratoria: string | null;
+  estadoPeticionMigratoria: string | null;
+  detallePeticionMigratoria: string | null;
+  solicitoResidenciaUsa: boolean | null;
+  solicitoAsiloUsa: boolean | null;
+  solicitoCambioEstatusUsa: boolean | null;
+
+  // Otros antecedentes
+  tuvoOtroAntecedenteMigratorio: boolean | null;
+  detalleOtroAntecedenteMigratorio: string | null;
+  observacionesMigratorias: string | null;
+
+  createdAt: Date;
+  updatedAt: Date;
+}
 export interface ClienteCompleto extends Cliente {
   region: {
     id: string;
@@ -130,6 +193,7 @@ export interface ClienteCompleto extends Cliente {
   datosMatrimoniales?: ClienteDatosMatrimoniales;
   datosPatrocinador?: ClienteDatosPatrocinador;
   datosViaje?: ClienteDatosViaje;
+datosMigratorios?: ClienteDatosMigratorios;
 }
 
 export interface ClienteListItem {
