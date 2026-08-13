@@ -452,11 +452,32 @@ export async function GET(
           nexusScore.motores
             .ARRAIGO.score,
 
-        CREDIBILIDAD_COHERENCIA:
-          nexusScore.motores
-            .CREDIBILIDAD_COHERENCIA
-            .score,
+        CREDIBILIDAD_COHERENCIA: {
+  score:
+    nexusScore.motores
+      .CREDIBILIDAD_COHERENCIA
+      .score,
 
+  coverage:
+    nexusScore.motores
+      .CREDIBILIDAD_COHERENCIA
+      .coverage,
+
+  strengths:
+    nexusScore.motores
+      .CREDIBILIDAD_COHERENCIA
+      .strengths,
+
+  observations:
+    nexusScore.motores
+      .CREDIBILIDAD_COHERENCIA
+      .observations,
+
+  missingData:
+    nexusScore.motores
+      .CREDIBILIDAD_COHERENCIA
+      .missingData,
+},
         MOTIVO_VIAJE:
           nexusScore.motores
             .MOTIVO_VIAJE.score,
