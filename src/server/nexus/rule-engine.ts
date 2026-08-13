@@ -811,11 +811,15 @@ function evaluateHistorialMigratorio(
     result.observations.push(
       "evaluación migratoria disponible; aún existen antecedentes por completar"
     );
-  } else {
+    } else {
     result.strengths.push(
       "historial migratorio con buena cobertura de información"
     );
+  }
+
+  return result;
 }
+
 function evaluateArraigo(
   input: NexusRuleInput
 ): NexusMotorEvaluation {
