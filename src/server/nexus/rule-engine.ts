@@ -74,7 +74,36 @@ export interface NexusRuleInput {
   tiempoEstadia?: string | null;
   paisesVisitados?: string | null;
 } | null;
+   migratorio?: {
+    tuvoVisaUsaAntes?: boolean | null;
+    tipoVisaUsaAnterior?: string | null;
 
+    viajoUsaAntes?: boolean | null;
+    cantidadViajesUsa?: number | null;
+    cumplioSiempreTiempoAutorizado?: boolean | null;
+
+    tuvoSobreestadia?: boolean | null;
+    diasSobreestadia?: number | null;
+
+    trabajoNoAutorizadoUsa?: boolean | null;
+
+    tuvoRechazoVisaUsa?: boolean | null;
+    cantidadRechazosVisaUsa?: number | null;
+
+    tuvoEntradaRechazadaUsa?: boolean | null;
+
+    tuvoProblemaCbP?: boolean | null;
+
+    tuvoDeportacionRemocion?: boolean | null;
+
+    tuvoPeticionMigratoriaUsa?: boolean | null;
+
+    solicitoResidenciaUsa?: boolean | null;
+    solicitoAsiloUsa?: boolean | null;
+    solicitoCambioEstatusUsa?: boolean | null;
+
+    tuvoOtroAntecedenteMigratorio?: boolean | null;
+  } | null;
   grupoFamiliarCount?: number | null;
 }
 
@@ -328,86 +357,416 @@ function evaluateHistorialMigratorio(
     "HISTORIAL_MIGRATORIO"
   );
 
+  const migratorio = input.migratorio;
+
+  let availableSignals = 0;
+  const totalSignals = 11;
+
+  let earned = 0;
+  let availableWeight = 0;
+
+  // ==========================================
+  // 1. HISTORIAL INTERNACIONAL — hasta 5 pts
+  // ==========================================
+
   const paisesTexto =
     input.viaje?.paisesVisitados?.trim();
 
-  if (!paisesTexto) {
+  if (paisesTexto) {
+    availableSignals += 1;
+    availableWeight += 5;
+
+    const paises = paisesTexto
+      .split(/[,;\n]+/)
+      .map((pais) =>
+        pais.trim().toLowerCase()
+      )
+      .filter(Boolean);
+
+    const paisesUnicos =
+      Array.from(new Set(paises));
+
+    const cantidad =
+      paisesUnicos.length;
+
+    let puntosViajes = 0;
+
+    if (cantidad >= 6) {
+      puntosViajes = 5;
+    } else if (cantidad >= 4) {
+      puntosViajes = 4.5;
+    } else if (cantidad >= 2) {
+      puntosViajes = 3.5;
+    } else if (cantidad === 1) {
+      puntosViajes = 2.5;
+    }
+
+    earned += puntosViajes;
+
+    result.strengths.push(
+      `${cantidad} país${
+        cantidad === 1 ? "" : "es"
+      } visitado${
+        cantidad === 1 ? "" : "s"
+      } registrado${
+        cantidad === 1 ? "" : "s"
+      }`
+    );
+
+    if (cantidad >= 4) {
+      result.strengths.push(
+        "historial internacional diversificado"
+      );
+    }
+  } else {
     result.missingData.push(
       "historial de viajes internacionales"
     );
+  }
 
+  // ==========================================
+  // 2. HISTORIAL USA ESTRUCTURADO — 10 pts
+  // ==========================================
+
+  if (!migratorio) {
     result.missingData.push(
-      "historial estructurado de visas, entradas, salidas y rechazos"
+      "historial migratorio estructurado de Estados Unidos"
+    );
+  } else {
+    // Visa anterior: contexto, no castiga
+    if (
+      migratorio.tuvoVisaUsaAntes !== null &&
+      migratorio.tuvoVisaUsaAntes !== undefined
+    ) {
+      availableSignals += 1;
+      availableWeight += 0.25;
+      earned += 0.25;
+
+      if (migratorio.tuvoVisaUsaAntes) {
+        result.strengths.push(
+          "antecedente de visa estadounidense registrado"
+        );
+
+        if (!migratorio.tipoVisaUsaAnterior) {
+          result.missingData.push(
+            "tipo de visa estadounidense anterior"
+          );
+        }
+      } else {
+        result.observations.push(
+          "solicitante sin visa estadounidense previa"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "antecedente de visa estadounidense"
+      );
+    }
+
+    // Viajes anteriores a USA: contexto, no castiga
+    if (
+      migratorio.viajoUsaAntes !== null &&
+      migratorio.viajoUsaAntes !== undefined
+    ) {
+      availableSignals += 1;
+      availableWeight += 0.25;
+      earned += 0.25;
+
+      if (migratorio.viajoUsaAntes) {
+        result.strengths.push(
+          "ingresos anteriores a Estados Unidos registrados"
+        );
+
+        if (
+          migratorio.cantidadViajesUsa != null &&
+          migratorio.cantidadViajesUsa > 1
+        ) {
+          result.strengths.push(
+            "múltiples viajes anteriores a Estados Unidos"
+          );
+        }
+      } else {
+        result.observations.push(
+          "sin viajes anteriores a Estados Unidos"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "viajes anteriores a Estados Unidos"
+      );
+    }
+
+    // Cumplimiento del tiempo autorizado
+    if (
+      migratorio.cumplioSiempreTiempoAutorizado !==
+        null &&
+      migratorio.cumplioSiempreTiempoAutorizado !==
+        undefined
+    ) {
+      availableSignals += 1;
+      availableWeight += 2;
+
+      if (
+        migratorio.cumplioSiempreTiempoAutorizado
+      ) {
+        earned += 2;
+
+        result.strengths.push(
+          "cumplimiento de permanencias autorizadas registrado"
+        );
+      } else {
+        result.observations.push(
+          "existe antecedente de incumplimiento del tiempo autorizado"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "cumplimiento de tiempos autorizados en Estados Unidos"
+      );
+    }
+
+    // Sobreestadía
+    if (
+      migratorio.tuvoSobreestadia !== null &&
+      migratorio.tuvoSobreestadia !== undefined
+    ) {
+      availableSignals += 1;
+      availableWeight += 2;
+
+      if (!migratorio.tuvoSobreestadia) {
+        earned += 2;
+
+        result.strengths.push(
+          "sin sobreestadía declarada"
+        );
+      } else {
+        result.observations.push(
+          migratorio.diasSobreestadia != null
+            ? `sobreestadía registrada de aproximadamente ${migratorio.diasSobreestadia} días`
+            : "antecedente de sobreestadía registrado"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "antecedentes de sobreestadía"
+      );
+    }
+
+    // Trabajo no autorizado
+    if (
+      migratorio.trabajoNoAutorizadoUsa !== null &&
+      migratorio.trabajoNoAutorizadoUsa !==
+        undefined
+    ) {
+      availableSignals += 1;
+      availableWeight += 1.5;
+
+      if (!migratorio.trabajoNoAutorizadoUsa) {
+        earned += 1.5;
+
+        result.strengths.push(
+          "sin trabajo no autorizado declarado"
+        );
+      } else {
+        result.observations.push(
+          "antecedente de trabajo no autorizado en Estados Unidos"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "antecedentes de trabajo no autorizado"
+      );
+    }
+
+    // Rechazos de visa
+    if (
+      migratorio.tuvoRechazoVisaUsa !== null &&
+      migratorio.tuvoRechazoVisaUsa !== undefined
+    ) {
+      availableSignals += 1;
+      availableWeight += 0.75;
+
+      if (!migratorio.tuvoRechazoVisaUsa) {
+        earned += 0.75;
+
+        result.strengths.push(
+          "sin rechazos de visa estadounidense declarados"
+        );
+      } else {
+        earned += 0.35;
+
+        result.observations.push(
+          migratorio.cantidadRechazosVisaUsa != null
+            ? `${migratorio.cantidadRechazosVisaUsa} rechazo(s) de visa registrado(s)`
+            : "antecedente de rechazo de visa registrado"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "historial de rechazos de visa estadounidense"
+      );
+    }
+
+    // Entrada rechazada
+    if (
+      migratorio.tuvoEntradaRechazadaUsa !== null &&
+      migratorio.tuvoEntradaRechazadaUsa !==
+        undefined
+    ) {
+      availableSignals += 1;
+      availableWeight += 0.75;
+
+      if (!migratorio.tuvoEntradaRechazadaUsa) {
+        earned += 0.75;
+      } else {
+        earned += 0.25;
+
+        result.observations.push(
+          "antecedente de ingreso rechazado a Estados Unidos"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "antecedentes de ingreso rechazado"
+      );
+    }
+
+    // Problemas con CBP
+    if (
+      migratorio.tuvoProblemaCbP !== null &&
+      migratorio.tuvoProblemaCbP !== undefined
+    ) {
+      availableSignals += 1;
+      availableWeight += 0.75;
+
+      if (!migratorio.tuvoProblemaCbP) {
+        earned += 0.75;
+      } else {
+        earned += 0.25;
+
+        result.observations.push(
+          "incidente o problema con CBP registrado"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "antecedentes de incidentes con CBP"
+      );
+    }
+
+    // Deportación / remoción
+    if (
+      migratorio.tuvoDeportacionRemocion !== null &&
+      migratorio.tuvoDeportacionRemocion !==
+        undefined
+    ) {
+      availableSignals += 1;
+      availableWeight += 1.5;
+
+      if (!migratorio.tuvoDeportacionRemocion) {
+        earned += 1.5;
+
+        result.strengths.push(
+          "sin deportación o remoción declarada"
+        );
+      } else {
+        result.observations.push(
+          "antecedente de deportación o remoción registrado"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "antecedentes de deportación o remoción"
+      );
+    }
+
+    // Otro antecedente relevante
+    if (
+      migratorio.tuvoOtroAntecedenteMigratorio !==
+        null &&
+      migratorio.tuvoOtroAntecedenteMigratorio !==
+        undefined
+    ) {
+      availableSignals += 1;
+      availableWeight += 0.25;
+
+      if (
+        !migratorio.tuvoOtroAntecedenteMigratorio
+      ) {
+        earned += 0.25;
+      } else {
+        result.observations.push(
+          "existe otro antecedente migratorio que requiere revisión"
+        );
+      }
+    } else {
+      result.missingData.push(
+        "otros antecedentes migratorios relevantes"
+      );
+    }
+
+    // Peticiones y procesos:
+    // se registran como contexto, NO como penalización.
+    if (
+      migratorio.tuvoPeticionMigratoriaUsa === true
+    ) {
+      result.observations.push(
+        "existe petición o proceso migratorio en Estados Unidos; requiere análisis de contexto"
+      );
+    }
+
+    if (migratorio.solicitoResidenciaUsa === true) {
+      result.observations.push(
+        "solicitud de residencia registrada"
+      );
+    }
+
+    if (migratorio.solicitoAsiloUsa === true) {
+      result.observations.push(
+        "solicitud de asilo registrada"
+      );
+    }
+
+    if (
+      migratorio.solicitoCambioEstatusUsa === true
+    ) {
+      result.observations.push(
+        "solicitud de cambio de estatus registrada"
+      );
+    }
+  }
+
+  result.coverage = Math.round(
+    (availableSignals / totalSignals) * 100
+  );
+
+  // Evitamos publicar una valoración migratoria
+  // con información demasiado fragmentaria.
+  if (
+    availableWeight === 0 ||
+    result.coverage < 45
+  ) {
+    result.score = null;
+
+    result.observations.push(
+      "historial migratorio todavía insuficiente para emitir puntaje"
     );
 
     return result;
   }
 
-  // Acepta países separados por:
-  // coma, punto y coma o salto de línea.
-  const paises = paisesTexto
-    .split(/[,;\n]+/)
-    .map((pais) =>
-      pais.trim().toLowerCase()
+  // Normalizamos solamente con la información
+  // disponible. Lo faltante NO equivale a cero.
+  const normalized =
+    (earned / availableWeight) *
+    result.max;
+
+  result.score = Math.max(
+    0,
+    Math.min(
+      result.max,
+      Math.round(normalized * 10) / 10
     )
-    .filter(Boolean);
-
-  // Evita contar repetidos.
-  const paisesUnicos =
-    Array.from(new Set(paises));
-
-  const cantidad =
-    paisesUnicos.length;
-
-  let scoreViajes = 0;
-
-  if (cantidad >= 6) {
-    scoreViajes = 10;
-  } else if (cantidad >= 4) {
-    scoreViajes = 9;
-  } else if (cantidad >= 2) {
-    scoreViajes = 7;
-  } else if (cantidad === 1) {
-    scoreViajes = 5;
-  }
-
-  result.coverage = 40;
-  result.score = scoreViajes;
-
-  result.strengths.push(
-    `${cantidad} país${
-      cantidad === 1 ? "" : "es"
-    } visitado${
-      cantidad === 1 ? "" : "s"
-    } registrado${
-      cantidad === 1 ? "" : "s"
-    }`
-  );
-
-  if (cantidad >= 4) {
-    result.strengths.push(
-      "historial internacional diversificado"
-    );
-  }
-
-  result.observations.push(
-    "el puntaje actual evalúa únicamente historial internacional registrado"
-  );
-
-  result.missingData.push(
-    "visas anteriores y resultados"
-  );
-
-  result.missingData.push(
-    "entradas, salidas y duración de estadías"
-  );
-
-  result.missingData.push(
-    "rechazos o antecedentes migratorios"
-  );
-
-  result.missingData.push(
-    "cumplimiento de condiciones migratorias en Estados Unidos"
   );
 
   return result;
