@@ -68,11 +68,12 @@ export interface NexusRuleInput {
   } | null;
 
   viaje?: {
-    motivo?: string | null;
-    lugar?: string | null;
-    fechaTentativa?: Date | null;
-    tiempoEstadia?: string | null;
-  } | null;
+  motivo?: string | null;
+  lugar?: string | null;
+  fechaTentativa?: Date | null;
+  tiempoEstadia?: string | null;
+  paisesVisitados?: string | null;
+} | null;
 
   grupoFamiliarCount?: number | null;
 }
@@ -320,7 +321,53 @@ function evaluateMotivo(
 
   return result;
 }
+function evaluateHistorialMigratorio(
+  input: NexusRuleInput
+): NexusMotorEvaluation {
+  const result = emptyMotor(
+    "HISTORIAL_MIGRATORIO"
+  );
 
+  const paisesVisitados =
+    input.viaje?.paisesVisitados?.trim();
+
+  if (!paisesVisitados) {
+    result.missingData.push(
+      "historial de viajes internacionales"
+    );
+
+    result.missingData.push(
+      "historial estructurado de visas, entradas, salidas y rechazos"
+    );
+
+    return result;
+  }
+
+  result.coverage = 25;
+  result.score = 8;
+
+  result.strengths.push(
+    "historial de viajes internacionales registrado"
+  );
+
+  result.observations.push(
+    "evaluación preliminar: aún falta conocer visas anteriores, rechazos, entradas, salidas y cumplimiento migratorio"
+  );
+
+  result.missingData.push(
+    "visas anteriores y resultados"
+  );
+
+  result.missingData.push(
+    "entradas, salidas y duración de estadías"
+  );
+
+  result.missingData.push(
+    "rechazos o antecedentes migratorios"
+  );
+
+  return result;
+}
 function evaluateArraigo(
   input: NexusRuleInput
 ): NexusMotorEvaluation {
@@ -458,10 +505,8 @@ export function evaluateNexusScore(
       "estatus y contexto migratorio de familiares en Estados Unidos"
     );
 
-  motores.HISTORIAL_MIGRATORIO
-    .missingData.push(
-      "historial estructurado de visas, entradas, salidas y rechazos"
-    );
+  motores.HISTORIAL_MIGRATORIO =
+  evaluateHistorialMigratorio(input);
 
   const evaluated = MOTOR_KEYS
     .map((key) => motores[key])
