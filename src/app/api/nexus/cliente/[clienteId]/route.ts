@@ -61,7 +61,9 @@ export async function GET(
       },
 
       datosViaje: true,
-
+      
+      datosMigratorios: true,
+      
       gruposFamiliares: {
         select: {
           id: true,
@@ -306,7 +308,73 @@ export async function GET(
           .paisesVisitados,
     }
   : null,
+           migratorio: cliente.datosMigratorios
+        ? {
+            tuvoVisaUsaAntes:
+              cliente.datosMigratorios.tuvoVisaUsaAntes,
 
+            tipoVisaUsaAnterior:
+              cliente.datosMigratorios.tipoVisaUsaAnterior,
+
+            viajoUsaAntes:
+              cliente.datosMigratorios.viajoUsaAntes,
+
+            cantidadViajesUsa:
+              cliente.datosMigratorios.cantidadViajesUsa,
+
+            cumplioSiempreTiempoAutorizado:
+              cliente.datosMigratorios
+                .cumplioSiempreTiempoAutorizado,
+
+            tuvoSobreestadia:
+              cliente.datosMigratorios.tuvoSobreestadia,
+
+            diasSobreestadia:
+              cliente.datosMigratorios.diasSobreestadia,
+
+            trabajoNoAutorizadoUsa:
+              cliente.datosMigratorios
+                .trabajoNoAutorizadoUsa,
+
+            tuvoRechazoVisaUsa:
+              cliente.datosMigratorios
+                .tuvoRechazoVisaUsa,
+
+            cantidadRechazosVisaUsa:
+              cliente.datosMigratorios
+                .cantidadRechazosVisaUsa,
+
+            tuvoEntradaRechazadaUsa:
+              cliente.datosMigratorios
+                .tuvoEntradaRechazadaUsa,
+
+            tuvoProblemaCbP:
+              cliente.datosMigratorios.tuvoProblemaCbP,
+
+            tuvoDeportacionRemocion:
+              cliente.datosMigratorios
+                .tuvoDeportacionRemocion,
+
+            tuvoPeticionMigratoriaUsa:
+              cliente.datosMigratorios
+                .tuvoPeticionMigratoriaUsa,
+
+            solicitoResidenciaUsa:
+              cliente.datosMigratorios
+                .solicitoResidenciaUsa,
+
+            solicitoAsiloUsa:
+              cliente.datosMigratorios.solicitoAsiloUsa,
+
+            solicitoCambioEstatusUsa:
+              cliente.datosMigratorios
+                .solicitoCambioEstatusUsa,
+
+            tuvoOtroAntecedenteMigratorio:
+              cliente.datosMigratorios
+                .tuvoOtroAntecedenteMigratorio,
+          }
+        : null,
       grupoFamiliarCount:
         cliente.gruposFamiliares.length,
     });
