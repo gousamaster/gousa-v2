@@ -382,6 +382,7 @@ model Cliente {
   tramites            Tramite[]
   gruposFamiliares    GrupoFamiliarMiembro[]
   comisiones          ComisionVenta[]
+  whatsappConversations WhatsAppConversation[]
 
   @@index([regionId])
   @@index([registradoPorId])
@@ -903,4 +904,55 @@ enum InvitationStatus {
   ACCEPTED
   REJECTED
   EXPIRED
+}
+model WhatsAppConversation {
+  id                 String   @id @default(cuid())
+  phoneNumber        String
+  contactName        String?
+  phoneNumberId      String?
+  displayPhoneNumber String?
+
+  clienteId          String?
+  cliente            Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+
+  status             String   @default("OPEN")
+  assignedUserId     String?
+
+  lastMessageAt      DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+
+  messages           WhatsAppMessage[]
+
+  @@unique([phoneNumber, phoneNumberId])
+  @@index([phoneNumber])
+  @@index([clienteId])
+  @@index([status])
+  @@index([lastMessageAt])
+  @@map("whatsapp_conversation")
+}
+
+model WhatsAppMessage {
+  id              String   @id @default(cuid())
+  conversationId  String
+  conversation    WhatsAppConversation
+    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  whatsappMessageId String? @unique
+
+  direction       String
+  type            String
+  text            String?
+
+  senderPhone     String?
+  sentAt          DateTime?
+
+  rawPayload      Json?
+
+  createdAt       DateTime @default(now())
+
+  @@index([conversationId])
+  @@index([direction])
+  @@index([sentAt])
+  @@map("whatsapp_message")
 }
