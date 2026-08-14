@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { db } from "@/lib/db";
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
@@ -56,33 +57,216 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const whatsappMessage = {
-      messageId: message.id ?? null,
-      from: message.from ?? null,
-      timestamp: message.timestamp ?? null,
-      type: message.type ?? null,
+    const messageId =
+      message.id ?? null;
 
-      contactName:
-        contact?.profile?.name ?? null,
+    const from =
+      message.from ?? null;
 
-      text:
-        message.type === "text"
-          ? message.text?.body ?? null
-          : null,
+    const type =
+      message.type ?? "unknown";
 
-      phoneNumberId,
-      displayPhoneNumber,
-    };
+    const contactName =
+      contact?.profile?.name ?? null;
+
+    const text =
+      message.type === "text"
+        ? message.text?.body ?? null
+        : null;
+
+    const sentAt =
+      message.timestamp
+        ? new Date(
+            Number(message.timestamp) * 1000
+          )
+        : new Date();
+
+    if (!from) {
+      console.warn(
+        "NEXUS WhatsApp message without sender phone"
+      );
+
+      return NextResponse.json(
+        { received: true },
+        { status: 200 }
+      );
+    }
+
+    // ==========================================
+    // 1. EVITAR MENSAJES DUPLICADOS
+    // ==========================================
+
+    if (messageId) {
+      const existingMessage =
+        await db.whatsAppMessage.findUnique({
+          where: {
+            whatsappMessageId: messageId,
+          },
+        });
+
+      if (existingMessage) {
+        console.log(
+          "NEXUS WhatsApp duplicate ignored:",
+          messageId
+        );
+
+        return NextResponse.json(
+          {
+            received: true,
+            duplicate: true,
+          },
+          { status: 200 }
+        );
+      }
+    }
+
+    // ==========================================
+    // 2. INTENTAR IDENTIFICAR CLIENTE
+    // ==========================================
+
+    const normalizedFrom =
+      from.replace(/\D/g, "");
+
+    const cliente =
+      await db.cliente.findFirst({
+        where: {
+          OR: [
+            {
+              telefonoCelular:
+                normalizedFrom,
+            },
+            {
+              telefonoCelular:
+                `+${normalizedFrom}`,
+            },
+          ],
+          activo: true,
+        },
+        select: {
+          id: true,
+        },
+      });
+
+    // ==========================================
+    // 3. BUSCAR O CREAR CONVERSACIÓN
+    // ==========================================
+
+    let conversation =
+      await db.whatsAppConversation.findFirst({
+        where: {
+          phoneNumber: normalizedFrom,
+          phoneNumberId,
+        },
+      });
+
+    if (!conversation) {
+      conversation =
+        await db.whatsAppConversation.create({
+          data: {
+            phoneNumber:
+              normalizedFrom,
+
+            contactName,
+
+            phoneNumberId,
+
+            displayPhoneNumber,
+
+            clienteId:
+              cliente?.id ?? null,
+
+            status: "OPEN",
+
+            lastMessageAt:
+              sentAt,
+          },
+        });
+    } else {
+      conversation =
+        await db.whatsAppConversation.update({
+          where: {
+            id: conversation.id,
+          },
+          data: {
+            contactName:
+              contactName ??
+              conversation.contactName,
+
+            displayPhoneNumber:
+              displayPhoneNumber ??
+              conversation.displayPhoneNumber,
+
+            clienteId:
+              conversation.clienteId ??
+              cliente?.id ??
+              null,
+
+            lastMessageAt:
+              sentAt,
+          },
+        });
+    }
+
+    // ==========================================
+    // 4. GUARDAR MENSAJE ENTRANTE
+    // ==========================================
+
+    const savedMessage =
+      await db.whatsAppMessage.create({
+        data: {
+          conversationId:
+            conversation.id,
+
+          whatsappMessageId:
+            messageId,
+
+          direction:
+            "INBOUND",
+
+          type,
+
+          text,
+
+          senderPhone:
+            normalizedFrom,
+
+          sentAt,
+
+          rawPayload:
+            body,
+        },
+      });
 
     console.log(
-      "NEXUS WhatsApp incoming message:",
-      JSON.stringify(whatsappMessage)
+      "NEXUS WhatsApp message saved:",
+      JSON.stringify({
+        conversationId:
+          conversation.id,
+
+        messageId:
+          savedMessage.id,
+
+        whatsappMessageId:
+          messageId,
+
+        from:
+          normalizedFrom,
+
+        clienteId:
+          conversation.clienteId,
+
+        text,
+      })
     );
 
     return NextResponse.json(
       {
         received: true,
-        message: whatsappMessage,
+        saved: true,
+        conversationId:
+          conversation.id,
+        messageId:
+          savedMessage.id,
       },
       { status: 200 }
     );
@@ -93,8 +277,11 @@ export async function POST(request: NextRequest) {
     );
 
     return NextResponse.json(
-      { error: "Invalid webhook payload" },
-      { status: 400 }
+      {
+        error:
+          "WhatsApp webhook processing failed",
+      },
+      { status: 500 }
     );
   }
 }
