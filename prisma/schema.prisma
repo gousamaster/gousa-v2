@@ -935,9 +935,7 @@ model WhatsAppConversation {
 model WhatsAppMessage {
   id              String   @id @default(cuid())
   conversationId  String
-  conversation    WhatsAppConversation
-    @relation(fields: [conversationId], references: [id], onDelete: Cascade)
-
+  conversation    WhatsAppConversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
   whatsappMessageId String? @unique
 
   direction       String
