@@ -371,6 +371,9 @@ convertidoAt    DateTime?
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
   deletedAt       DateTime?
+cliente       Cliente? @relation(fields: [clienteId], references: [id], onDelete: SetNull)
+creadoPor     User?    @relation("ProspectoCreadoPor", fields: [creadoPorId], references: [id], onDelete: SetNull)
+convertidoPor User?    @relation("ProspectoConvertidoPor", fields: [convertidoPorId], references: [id], onDelete: SetNull)
 
   @@index([telefono])
   @@index([email])
