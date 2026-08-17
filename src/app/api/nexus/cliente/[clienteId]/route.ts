@@ -425,17 +425,17 @@ const citas = tramiteSeleccionado
     },
 
     tramite: {
-      id:
-        tramiteSeleccionado?.id ??
-        null,
-      :
-        tramiteSeleccionado
-          ?.estadoActual?.nombre ??
-        null,
-      codigoConfirmacionDs160:
-        tramiteSeleccionado
-          ?.codigoConfirmacionDs160 ??
-        null,
+  id:
+    tramiteSeleccionado?.id ??
+    null,
+  estado:
+    tramiteSeleccionado
+      ?.estadoActual?.nombre ??
+    null,
+  codigoConfirmacionDs160:
+    tramiteSeleccionado
+      ?.codigoConfirmacionDs160 ??
+    null,
       estadoDs160: null,
       estadoDs160_provisional: false,
     },
