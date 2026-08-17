@@ -141,8 +141,10 @@ export async function GET(
       },
     });
 
-  // Citas próximas
-  const citas = tramiteSeleccionado
+ // Citas próximas
+const now = new Date();
+
+const citas = tramiteSeleccionado
   ? await db.cita.findMany({
       where: {
         tramiteId: tramiteSeleccionado.id,
