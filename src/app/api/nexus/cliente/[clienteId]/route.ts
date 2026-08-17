@@ -203,20 +203,20 @@ export async function GET(
           tramiteId:
             tramiteSeleccionado.id,
         },
-        include: {
-          usuario: {
-            select: {
-              id: true,
-              name: true,
-            },
-          },
-          : {
-            select: {
-              id: true,
-              nombre: true,
-            },
-          },
-        },
+       include: {
+  usuario: {
+    select: {
+      id: true,
+      name: true,
+    },
+  },
+  estado: {
+    select: {
+      id: true,
+      nombre: true,
+    },
+  },
+},
         orderBy: {
           createdAt: "desc",
         },
