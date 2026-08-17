@@ -90,6 +90,8 @@ export async function GET(
         select: {
           id: true,
           nombre: true,
+          codigo: true,
+          orden: true,
         },
       },
       usuarioAsignado: {
@@ -106,7 +108,21 @@ export async function GET(
 
   // Provisional: seleccionar tramite por updatedAt DESC
   const tramiteSeleccionado =
-    tramites.length > 0 ? tramites[0] : null;
+  tramites.length > 0
+    ? [...tramites].sort((a, b) => {
+        const ordenA = a.estadoActual?.orden ?? 0;
+        const ordenB = b.estadoActual?.orden ?? 0;
+
+        if (ordenA !== ordenB) {
+          return ordenB - ordenA;
+        }
+
+        return (
+          new Date(b.updatedAt).getTime() -
+          new Date(a.updatedAt).getTime()
+        );
+      })[0]
+    : null;
 
   // Servicios del cliente
   const servicios =
@@ -126,31 +142,29 @@ export async function GET(
     });
 
   // Citas próximas
-  const now = new Date();
-
-  const citas = await db.cita.findMany({
-    where: {
-      fechaHora: {
-        gt: now,
+  const citas = tramiteSeleccionado
+  ? await db.cita.findMany({
+      where: {
+        tramiteId: tramiteSeleccionado.id,
+        fechaHora: {
+          gt: now,
+        },
+        deletedAt: null,
       },
-      deletedAt: null,
-      tramiteId: {
-        not: null,
-      },
-    },
-    include: {
-      tipoCita: {
-        select: {
-          id: true,
-          nombre: true,
-          codigo: true,
+      include: {
+        tipoCita: {
+          select: {
+            id: true,
+            nombre: true,
+            codigo: true,
+          },
         },
       },
-    },
-    orderBy: {
-      fechaHora: "asc",
-    },
-  });
+      orderBy: {
+        fechaHora: "asc",
+      },
+    })
+  : [];
 
   // Identificar próxima entrevista y simulacro
   let proximaEntrevista = null;
@@ -196,7 +210,7 @@ export async function GET(
               name: true,
             },
           },
-          estado: {
+          : {
             select: {
               id: true,
               nombre: true,
@@ -412,7 +426,7 @@ export async function GET(
       id:
         tramiteSeleccionado?.id ??
         null,
-      estado:
+      :
         tramiteSeleccionado
           ?.estadoActual?.nombre ??
         null,
