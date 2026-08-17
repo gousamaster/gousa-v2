@@ -43,6 +43,8 @@ model User {
 
   // Relaciones con el CRM
   clientesRegistrados     Cliente[]              @relation("ClienteRegistradoPor")
+  prospectosCreados Prospecto[] @relation("ProspectoCreadoPor")
+  prospectosConvertidos Prospecto[] @relation("ProspectoConvertidoPor")  
   comisionesGeneradas     ComisionVenta[]        @relation("ComisionUsuario")
   tramitesAsignados       Tramite[]              @relation("TramiteUsuarioAsignado")
   aprobacionesSolicitadas Aprobacion[]           @relation("AprobacionSolicitante")
@@ -344,7 +346,39 @@ model CatalogoTipoAprobacion {
   @@index([activo])
   @@map("catalogo_tipo_aprobacion")
 }
+model Prospecto {
+  id              String   @id @default(cuid())
+  nombres         String
+  apellidos       String?
+  telefono        String
+  email           String?
+  ciudad          String?
+  pais            String?  @default("Bolivia")
 
+  origen          String?
+  interes         String?
+  observaciones   String?
+
+  estado          String   @default("NUEVO")
+
+  scorePreliminar Int?
+convertido      Boolean  @default(false)
+
+clienteId       String?  @unique
+creadoPorId     String?
+convertidoPorId String?
+convertidoAt    DateTime?
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  deletedAt       DateTime?
+
+  @@index([telefono])
+  @@index([email])
+  @@index([estado])
+  @@index([convertido])
+  @@index([deletedAt])
+  @@map("prospecto")
+}
 // ============================================
 // CLIENTES
 // ============================================
@@ -381,6 +415,7 @@ model Cliente {
   servicios           ClienteServicio[]
   tramites            Tramite[]
   gruposFamiliares    GrupoFamiliarMiembro[]
+  prospectoOrigen     Prospecto?
   comisiones          ComisionVenta[]
   whatsappConversations WhatsAppConversation[]
 
