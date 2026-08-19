@@ -1,7 +1,8 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
 import { ProspectoDetalle } from "@/components/system/prospectos/prospecto-detalle";
+import { Button } from "@/components/ui/button";
+import { auth } from "@/lib/auth";
 
 export default async function ProspectoPage({
   params,
@@ -18,5 +19,14 @@ export default async function ProspectoPage({
 
   const { prospectoId } = await params;
 
-  return <ProspectoDetalle prospectoId={prospectoId} />;
+  return (
+    <div className="flex-1">
+      <div className="px-8 pt-6">
+        <Button asChild>
+          <a href={`/prospectos/${prospectoId}/score`}>Evaluar Score NEXUS</a>
+        </Button>
+      </div>
+      <ProspectoDetalle prospectoId={prospectoId} />
+    </div>
+  );
 }
