@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -42,6 +42,25 @@ const initialForm = {
   observaciones: "",
 };
 
+function prioridadScore(prospecto: Prospecto) {
+  if (prospecto.convertido) return "CONVERTIDO";
+  if (prospecto.scorePreliminar === null) return "SIN_EVALUAR";
+  if (prospecto.scorePreliminar >= 75) return "ALTA";
+  if (prospecto.scorePreliminar >= 50) return "MEDIA";
+  return "BAJA";
+}
+
+function prioridadLabel(value: string) {
+  const labels: Record<string, string> = {
+    ALTA: "Prioridad alta",
+    MEDIA: "Prioridad media",
+    BAJA: "Prioridad baja",
+    SIN_EVALUAR: "Sin evaluar",
+    CONVERTIDO: "Convertido",
+  };
+  return labels[value] ?? value;
+}
+
 export function ProspectosContainer() {
   const router = useRouter();
   const [prospectos, setProspectos] = useState<Prospecto[]>([]);
@@ -50,6 +69,7 @@ export function ProspectosContainer() {
   const [saving, setSaving] = useState(false);
   const [form, setForm] = useState(initialForm);
   const [error, setError] = useState("");
+  const [filtro, setFiltro] = useState("TODOS");
 
   const loadProspectos = async () => {
     try {
@@ -77,6 +97,23 @@ export function ProspectosContainer() {
   useEffect(() => {
     loadProspectos();
   }, []);
+
+  const prospectosOrdenados = useMemo(() => {
+    const activos = prospectos.filter((prospecto) => !prospecto.convertido);
+    const convertidos = prospectos.filter((prospecto) => prospecto.convertido);
+
+    const ordenar = (items: Prospecto[]) =>
+      [...items].sort((a, b) => {
+        const scoreA = a.scorePreliminar ?? -1;
+        const scoreB = b.scorePreliminar ?? -1;
+        if (scoreA !== scoreB) return scoreB - scoreA;
+        return new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime();
+      });
+
+    const lista = [...ordenar(activos), ...ordenar(convertidos)];
+    if (filtro === "TODOS") return lista;
+    return lista.filter((prospecto) => prioridadScore(prospecto) === filtro);
+  }, [prospectos, filtro]);
 
   const handleChange = (
     event:
@@ -138,8 +175,7 @@ export function ProspectosContainer() {
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Prospectos</h2>
           <p className="text-muted-foreground">
-            Registra, evalúa y da seguimiento a personas antes de convertirlas
-            en clientes.
+            Registra, evalúa y prioriza personas antes de convertirlas en clientes.
           </p>
         </div>
 
@@ -155,113 +191,46 @@ export function ProspectosContainer() {
           </CardHeader>
 
           <CardContent>
-            <form
-              onSubmit={handleSubmit}
-              className="grid gap-4 md:grid-cols-2"
-            >
+            <form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
               <div className="space-y-2">
                 <Label htmlFor="nombres">Nombres *</Label>
-                <Input
-                  id="nombres"
-                  name="nombres"
-                  value={form.nombres}
-                  onChange={handleChange}
-                />
+                <Input id="nombres" name="nombres" value={form.nombres} onChange={handleChange} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="apellidos">Apellidos</Label>
-                <Input
-                  id="apellidos"
-                  name="apellidos"
-                  value={form.apellidos}
-                  onChange={handleChange}
-                />
+                <Input id="apellidos" name="apellidos" value={form.apellidos} onChange={handleChange} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="telefono">Teléfono *</Label>
-                <Input
-                  id="telefono"
-                  name="telefono"
-                  value={form.telefono}
-                  onChange={handleChange}
-                />
+                <Input id="telefono" name="telefono" value={form.telefono} onChange={handleChange} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  value={form.email}
-                  onChange={handleChange}
-                />
+                <Input id="email" name="email" type="email" value={form.email} onChange={handleChange} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="ciudad">Ciudad</Label>
-                <Input
-                  id="ciudad"
-                  name="ciudad"
-                  value={form.ciudad}
-                  onChange={handleChange}
-                />
+                <Input id="ciudad" name="ciudad" value={form.ciudad} onChange={handleChange} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="pais">País</Label>
-                <Input
-                  id="pais"
-                  name="pais"
-                  value={form.pais}
-                  onChange={handleChange}
-                />
+                <Input id="pais" name="pais" value={form.pais} onChange={handleChange} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="origen">Origen</Label>
-                <Input
-                  id="origen"
-                  name="origen"
-                  placeholder="WhatsApp, referido, Facebook..."
-                  value={form.origen}
-                  onChange={handleChange}
-                />
+                <Input id="origen" name="origen" placeholder="WhatsApp, referido, Facebook..." value={form.origen} onChange={handleChange} />
               </div>
-
               <div className="space-y-2">
                 <Label htmlFor="interes">Interés</Label>
-                <Input
-                  id="interes"
-                  name="interes"
-                  placeholder="Visa turista, estudiante..."
-                  value={form.interes}
-                  onChange={handleChange}
-                />
+                <Input id="interes" name="interes" placeholder="Visa turista, estudiante..." value={form.interes} onChange={handleChange} />
               </div>
-
               <div className="space-y-2 md:col-span-2">
                 <Label htmlFor="observaciones">Observaciones</Label>
-                <Textarea
-                  id="observaciones"
-                  name="observaciones"
-                  value={form.observaciones}
-                  onChange={handleChange}
-                />
+                <Textarea id="observaciones" name="observaciones" value={form.observaciones} onChange={handleChange} />
               </div>
-
-              {error && (
-                <p className="text-sm text-destructive md:col-span-2">
-                  {error}
-                </p>
-              )}
-
+              {error && <p className="text-sm text-destructive md:col-span-2">{error}</p>}
               <div className="md:col-span-2">
-                <Button type="submit" disabled={saving}>
-                  {saving ? "Guardando..." : "Guardar prospecto"}
-                </Button>
+                <Button type="submit" disabled={saving}>{saving ? "Guardando..." : "Guardar prospecto"}</Button>
               </div>
             </form>
           </CardContent>
@@ -269,54 +238,73 @@ export function ProspectosContainer() {
       )}
 
       <Card>
-        <CardHeader>
-          <CardTitle>Prospectos registrados</CardTitle>
+        <CardHeader className="gap-4">
+          <div>
+            <CardTitle>Prospectos registrados</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Los prospectos activos se ordenan por Score NEXUS para facilitar el seguimiento comercial.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {[
+              ["TODOS", "Todos"],
+              ["ALTA", "Alta"],
+              ["MEDIA", "Media"],
+              ["BAJA", "Baja"],
+              ["SIN_EVALUAR", "Sin evaluar"],
+              ["CONVERTIDO", "Convertidos"],
+            ].map(([value, label]) => (
+              <Button
+                key={value}
+                type="button"
+                size="sm"
+                variant={filtro === value ? "default" : "outline"}
+                onClick={() => setFiltro(value)}
+              >
+                {label}
+              </Button>
+            ))}
+          </div>
         </CardHeader>
 
         <CardContent>
           {loading ? (
+            <p className="text-sm text-muted-foreground">Cargando prospectos...</p>
+          ) : prospectosOrdenados.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Cargando prospectos...
-            </p>
-          ) : prospectos.length === 0 ? (
-            <p className="text-sm text-muted-foreground">
-              Todavía no hay prospectos registrados.
+              {prospectos.length === 0 ? "Todavía no hay prospectos registrados." : "No hay prospectos en este filtro."}
             </p>
           ) : (
             <div className="space-y-3">
-              {prospectos.map((prospecto) => (
-                <div
-  key={prospecto.id}
-  onClick={() => router.push(`/prospectos/${prospecto.id}`)}
-  className="flex cursor-pointer flex-col gap-2 rounded-lg border p-4 transition-colors hover:bg-muted/50 md:flex-row md:items-center md:justify-between"
->
-                  <div>
-                    <p className="font-medium">
-                      {prospecto.nombres} {prospecto.apellidos ?? ""}
-                    </p>
+              {prospectosOrdenados.map((prospecto) => {
+                const prioridad = prioridadScore(prospecto);
+                return (
+                  <div
+                    key={prospecto.id}
+                    onClick={() => router.push(`/prospectos/${prospecto.id}`)}
+                    className="flex cursor-pointer flex-col gap-3 rounded-lg border p-4 transition-colors hover:bg-muted/50 md:flex-row md:items-center md:justify-between"
+                  >
+                    <div>
+                      <p className="font-medium">{prospecto.nombres} {prospecto.apellidos ?? ""}</p>
+                      <p className="text-sm text-muted-foreground">
+                        {prospecto.telefono}{prospecto.email ? ` · ${prospecto.email}` : ""}
+                      </p>
+                      <p className="text-sm text-muted-foreground">Interés: {prospecto.interes || "Sin definir"}</p>
+                      <p className="text-xs text-muted-foreground">Registrado por: {prospecto.creadoPor?.name || "Sin identificar"}</p>
+                    </div>
 
-                    <p className="text-sm text-muted-foreground">
-                      {prospecto.telefono}
-                      {prospecto.email ? ` · ${prospecto.email}` : ""}
-                    </p>
-
-                    <p className="text-sm text-muted-foreground">
-                      Interés: {prospecto.interes || "Sin definir"}
-                    </p>
-
-                    <p className="text-xs text-muted-foreground">
-                      Registrado por:{" "}
-                      {prospecto.creadoPor?.name || "Sin identificar"}
-                    </p>
+                    <div className="flex flex-wrap items-center gap-2 text-sm md:justify-end">
+                      {prospecto.scorePreliminar !== null ? (
+                        <span className="rounded-full border px-3 py-1 font-medium">Score {prospecto.scorePreliminar}%</span>
+                      ) : (
+                        <span className="rounded-full border border-dashed px-3 py-1 text-muted-foreground">Score pendiente</span>
+                      )}
+                      <span className="rounded-full border px-3 py-1">{prioridadLabel(prioridad)}</span>
+                      <span className="rounded-full border px-3 py-1">{prospecto.estado}</span>
+                    </div>
                   </div>
-
-                  <div className="text-sm">
-                    <span className="rounded-full border px-3 py-1">
-                      {prospecto.estado}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </CardContent>
