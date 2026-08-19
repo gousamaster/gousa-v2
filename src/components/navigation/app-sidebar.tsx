@@ -26,78 +26,30 @@ import {
 
 const data = {
   navMain: [
-    {
-      title: "Dashboard",
-      url: "/dashboard",
-      icon: AppWindowIcon,
-    },
-    {
-      title: "Prospectos",
-      url: "/prospectos",
-      icon: UserPlusIcon,
-    },
-    {
-      title: "Clientes",
-      url: "/clients",
-      icon: UsersIcon,
-    },
-    {
-      title: "Trámites",
-      url: "/tramites",
-      icon: NotebookIcon,
-    },
-    {
-      title: "Citas",
-      url: "/citas",
-      icon: CalendarIcon,
-    },
+    { title: "Dashboard", url: "/dashboard", icon: AppWindowIcon },
+    { title: "Prospectos", url: "/prospectos", icon: UserPlusIcon },
+    { title: "Clientes", url: "/clients", icon: UsersIcon },
+    { title: "Trámites", url: "/tramites", icon: NotebookIcon },
+    { title: "Citas", url: "/citas", icon: CalendarIcon },
     {
       title: "Servicios",
       url: "#",
       icon: ConciergeBellIcon,
-      isActive: true,
       items: [
-        {
-          title: "Vuelos",
-          url: "/servicios/vuelos",
-        },
-        {
-          title: "Hospedaje",
-          url: "#",
-          disabled: true,
-        },
-        {
-          title: "Rent a Car",
-          url: "#",
-          disabled: true,
-        },
-        {
-          title: "Atracciones",
-          url: "#",
-          disabled: true,
-        },
+        { title: "Vuelos", url: "/servicios/vuelos" },
+        { title: "Hospedaje", url: "/servicios/hospedaje" },
+        { title: "Rent a Car", url: "#", disabled: true },
+        { title: "Atracciones", url: "#", disabled: true },
       ],
     },
-    {
-      title: "Usuarios",
-      url: "/administration",
-      icon: UsersIcon,
-    },
-    {
-      title: "Configuraciones",
-      url: "/settings",
-      icon: SettingsIcon,
-    },
+    { title: "Usuarios", url: "/administration", icon: UsersIcon },
+    { title: "Configuraciones", url: "/settings", icon: SettingsIcon },
   ],
 };
 
 export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar
-      collapsible="icon"
-      className="top-(--header-height) h-[calc(100svh-var(--header-height))]!"
-      {...props}
-    >
+    <Sidebar collapsible="icon" className="top-(--header-height) h-[calc(100svh-var(--header-height))]!" {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>
@@ -115,12 +67,8 @@ export function AppSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
           </SidebarMenuItem>
         </SidebarMenu>
       </SidebarHeader>
-      <SidebarContent>
-        <NavMain items={data.navMain} />
-      </SidebarContent>
-      <SidebarFooter>
-        <NavUser />
-      </SidebarFooter>
+      <SidebarContent><NavMain items={data.navMain} /></SidebarContent>
+      <SidebarFooter><NavUser /></SidebarFooter>
     </Sidebar>
   );
 }
