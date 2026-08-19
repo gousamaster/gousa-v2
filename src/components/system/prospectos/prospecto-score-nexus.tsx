@@ -2,7 +2,15 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, CheckCircle2, Loader2, ShieldAlert } from "lucide-react";
+import {
+  AlertTriangle,
+  ArrowLeft,
+  CheckCircle2,
+  Lightbulb,
+  Loader2,
+  ShieldAlert,
+  Target,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -20,6 +28,21 @@ type ScoreQuestion = {
   opciones: ScoreOption[];
 };
 
+type ScoreInsight = {
+  preguntaId: string;
+  titulo: string;
+  respuesta: string;
+  aporte: number;
+  peso: number;
+};
+
+type ScoreAnalysis = {
+  prioridadComercial: "ALTA" | "MEDIA" | "BAJA";
+  fortalezas: ScoreInsight[];
+  alertas: ScoreInsight[];
+  acciones: string[];
+};
+
 type ScoreEvaluation = {
   id: string;
   score: number;
@@ -28,6 +51,7 @@ type ScoreEvaluation = {
   respuestas?: Record<string, string>;
   evaluadorNombre?: string | null;
   createdAt?: string;
+  analisis?: ScoreAnalysis | null;
 };
 
 type ScorePayload = {
@@ -54,6 +78,15 @@ function labelClasificacion(value: string) {
     BAJO: "Perfil bajo",
   };
   return labels[value] ?? value;
+}
+
+function labelPrioridad(value: ScoreAnalysis["prioridadComercial"]) {
+  const labels = {
+    ALTA: "Alta",
+    MEDIA: "Media",
+    BAJA: "Baja",
+  };
+  return labels[value];
 }
 
 export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
@@ -146,8 +179,9 @@ export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
     );
   }
 
-  const modeloCambio =
-    resultado && resultado.modeloVersion !== data.modelo.version;
+  const modeloCambio = resultado && resultado.modeloVersion !== data.modelo.version;
+  const analisis =
+    resultado?.modeloVersion === data.modelo.version ? resultado.analisis : null;
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
@@ -163,7 +197,7 @@ export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
         </div>
 
         {resultado && (
-          <Card className="min-w-[220px]">
+          <Card className="min-w-[240px]">
             <CardContent className="pt-5">
               <p className="text-xs uppercase tracking-widest text-muted-foreground">Último Score</p>
               <div className="mt-1 flex items-end gap-2">
@@ -171,6 +205,11 @@ export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
                 <span className="pb-1 text-sm text-muted-foreground">{labelClasificacion(resultado.clasificacion)}</span>
               </div>
               <p className="mt-1 text-xs text-muted-foreground">{resultado.modeloVersion}</p>
+              {analisis && (
+                <p className="mt-2 text-sm font-medium">
+                  Prioridad de seguimiento: {labelPrioridad(analisis.prioridadComercial)}
+                </p>
+              )}
             </CardContent>
           </Card>
         )}
@@ -191,6 +230,70 @@ export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
           </div>
         </CardContent>
       </Card>
+
+      {analisis && (
+        <div className="grid gap-4 lg:grid-cols-3">
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <CheckCircle2 className="h-5 w-5" /> Fortalezas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {analisis.fortalezas.length > 0 ? (
+                analisis.fortalezas.map((item) => (
+                  <div key={item.preguntaId}>
+                    <p className="font-medium">{item.titulo}</p>
+                    <p className="text-muted-foreground">{item.respuesta}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted-foreground">Todavía no se identifican fortalezas claras en esta evaluación.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <AlertTriangle className="h-5 w-5" /> Alertas
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {analisis.alertas.length > 0 ? (
+                analisis.alertas.map((item) => (
+                  <div key={item.preguntaId}>
+                    <p className="font-medium">{item.titulo}</p>
+                    <p className="text-muted-foreground">{item.respuesta}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted-foreground">No hay alertas principales en las respuestas actuales.</p>
+              )}
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-base">
+                <Lightbulb className="h-5 w-5" /> Próximas acciones
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              {analisis.acciones.length > 0 ? (
+                analisis.acciones.map((accion, index) => (
+                  <div key={`${index}-${accion}`} className="flex gap-2">
+                    <Target className="mt-0.5 h-4 w-4 shrink-0" />
+                    <p>{accion}</p>
+                  </div>
+                ))
+              ) : (
+                <p className="text-muted-foreground">Mantener la información actualizada y validar cambios antes de una nueva evaluación.</p>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
