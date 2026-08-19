@@ -25,6 +25,7 @@ type ScoreEvaluation = {
   score: number;
   clasificacion: string;
   modeloVersion: string;
+  respuestas?: Record<string, string>;
   evaluadorNombre?: string | null;
   createdAt?: string;
 };
@@ -75,8 +76,14 @@ export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
       if (!response.ok) throw new Error(payload.error || "No se pudo cargar el Score NEXUS");
       setData(payload);
       setResultado(payload.ultimaEvaluacion);
-      if (payload.ultimaEvaluacion?.respuestas) {
+
+      if (
+        payload.ultimaEvaluacion?.respuestas &&
+        payload.ultimaEvaluacion.modeloVersion === payload.modelo.version
+      ) {
         setRespuestas(payload.ultimaEvaluacion.respuestas);
+      } else {
+        setRespuestas({});
       }
     } catch (err) {
       console.error(err);
@@ -139,6 +146,9 @@ export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
     );
   }
 
+  const modeloCambio =
+    resultado && resultado.modeloVersion !== data.modelo.version;
+
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
@@ -160,6 +170,7 @@ export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
                 <span className="text-4xl font-bold">{resultado.score}%</span>
                 <span className="pb-1 text-sm text-muted-foreground">{labelClasificacion(resultado.clasificacion)}</span>
               </div>
+              <p className="mt-1 text-xs text-muted-foreground">{resultado.modeloVersion}</p>
             </CardContent>
           </Card>
         )}
@@ -171,7 +182,12 @@ export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
           <div>
             <p className="font-medium">Índice interno orientativo</p>
             <p className="text-muted-foreground">{data.modelo.aviso}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Modelo: {data.modelo.version}</p>
+            <p className="mt-1 text-xs text-muted-foreground">Modelo actual: {data.modelo.version}</p>
+            {modeloCambio && (
+              <p className="mt-2 font-medium">
+                Hay una versión nueva del modelo. La evaluación anterior permanece en el historial y esta versión se responde desde cero para mantener la comparación limpia.
+              </p>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -182,8 +198,9 @@ export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
         {data.modelo.preguntas.map((pregunta, index) => (
           <Card key={pregunta.id}>
             <CardHeader>
-              <CardTitle className="text-base">
-                {index + 1}. {pregunta.titulo}
+              <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
+                <span>{index + 1}. {pregunta.titulo}</span>
+                <span className="text-xs font-normal text-muted-foreground">Peso: {pregunta.peso}%</span>
               </CardTitle>
               <p className="text-sm text-muted-foreground">{pregunta.ayuda}</p>
             </CardHeader>
