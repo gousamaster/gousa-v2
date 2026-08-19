@@ -19,6 +19,8 @@ export async function ensureHospedajeSchema() {
       "checkIn" TIMESTAMP(3) NOT NULL,
       "checkOut" TIMESTAMP(3) NOT NULL,
       "habitaciones" INTEGER NOT NULL DEFAULT 1,
+      "personas" INTEGER NOT NULL DEFAULT 1,
+      "menores9" INTEGER NOT NULL DEFAULT 0,
       "observaciones" TEXT,
       "estado" TEXT NOT NULL DEFAULT 'PENDIENTE' CHECK ("estado" IN ('PENDIENTE','DESPACHADA')),
       "creadoPorId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
@@ -27,10 +29,14 @@ export async function ensureHospedajeSchema() {
       "despachadoAt" TIMESTAMP(3),
       CHECK (("prospectoId" IS NOT NULL AND "clienteId" IS NULL) OR ("prospectoId" IS NULL AND "clienteId" IS NOT NULL)),
       CHECK ("checkOut" > "checkIn"),
-      CHECK ("habitaciones" > 0)
+      CHECK ("habitaciones" > 0),
+      CHECK ("personas" > 0),
+      CHECK ("menores9" >= 0 AND "menores9" <= "personas")
     )
   `);
 
+  await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "personas" INTEGER NOT NULL DEFAULT 1`);
+  await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "menores9" INTEGER NOT NULL DEFAULT 0`);
   await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_hospedaje_estado_idx" ON "orden_cotizacion_hospedaje"("estado")`);
   await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_hospedaje_createdAt_idx" ON "orden_cotizacion_hospedaje"("createdAt")`);
 }
