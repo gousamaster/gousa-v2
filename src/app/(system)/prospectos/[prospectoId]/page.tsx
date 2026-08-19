@@ -32,15 +32,17 @@ export default async function ProspectoPage({
           <a href={`/prospectos/${prospectoId}/score`}>Evaluar Score NEXUS</a>
         </Button>
       </div>
-      <ProspectoDetalle prospectoId={prospectoId} />
+
       {prospecto && (
-        <div className="px-8 pb-8">
+        <div className="px-8 pt-6">
           <ProspectoSeguimiento
             prospectoId={prospectoId}
             convertido={prospecto.convertido}
           />
         </div>
       )}
+
+      <ProspectoDetalle prospectoId={prospectoId} />
     </div>
   );
 }
