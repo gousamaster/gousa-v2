@@ -1,4 +1,4 @@
-import { ArrowRight, BrainCircuit, UserPlus } from "lucide-react";
+import { ArrowRight, BrainCircuit, Gauge, UserPlus } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 export function DashboardAccesosComerciales() {
@@ -10,6 +10,12 @@ export function DashboardAccesosComerciales() {
       icono: UserPlus,
     },
     {
+      titulo: "Evaluar Score NEXUS",
+      descripcion: "Selecciona o registra un prospecto para medir su índice orientativo",
+      href: "/prospectos",
+      icono: Gauge,
+    },
+    {
       titulo: "GoUSA NEXUS",
       descripcion: "Selecciona un cliente y abre su análisis NEXUS",
       href: "/clients",
@@ -19,7 +25,7 @@ export function DashboardAccesosComerciales() {
 
   return (
     <div className="px-8 pt-6">
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-4 md:grid-cols-3">
         {accesos.map(({ titulo, descripcion, href, icono: Icono }) => (
           <a key={titulo} href={href}>
             <Card className="h-full cursor-pointer transition-all hover:border-primary/50 hover:shadow-md">
