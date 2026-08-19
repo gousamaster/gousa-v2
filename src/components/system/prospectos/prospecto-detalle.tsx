@@ -56,6 +56,9 @@ export function ProspectoDetalle({
   const [prospecto, setProspecto] = useState<Prospecto | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [editForm, setEditForm] = useState<Prospecto | null>(null);
 
   useEffect(() => {
     const loadProspecto = async () => {
