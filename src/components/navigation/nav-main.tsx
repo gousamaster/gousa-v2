@@ -2,7 +2,7 @@
 
 "use client";
 
-import { ChevronRight, type LucideIcon } from "lucide-react";
+import { ChevronRight, LockKeyhole, type LucideIcon } from "lucide-react";
 
 import {
   Collapsible,
@@ -31,12 +31,12 @@ export function NavMain({
     items?: {
       title: string;
       url: string;
+      disabled?: boolean;
     }[];
   }[];
 }) {
   return (
     <SidebarGroup>
-      {/* <SidebarGroupLabel>Platform</SidebarGroupLabel> */}
       <SidebarMenu>
         {items.map((item) => (
           <Collapsible key={item.title} asChild defaultOpen={item.isActive}>
@@ -57,13 +57,26 @@ export function NavMain({
                   </CollapsibleTrigger>
                   <CollapsibleContent>
                     <SidebarMenuSub>
-                      {item.items?.map((subItem) => (
+                      {item.items.map((subItem) => (
                         <SidebarMenuSubItem key={subItem.title}>
-                          <SidebarMenuSubButton asChild>
-                            <a href={subItem.url}>
-                              <span>{subItem.title}</span>
-                            </a>
-                          </SidebarMenuSubButton>
+                          {subItem.disabled ? (
+                            <SidebarMenuSubButton
+                              aria-disabled="true"
+                              className="cursor-not-allowed opacity-50"
+                              title={`${subItem.title} · Próximamente`}
+                            >
+                              <span className="flex w-full items-center justify-between gap-2">
+                                <span>{subItem.title}</span>
+                                <LockKeyhole className="h-3.5 w-3.5" />
+                              </span>
+                            </SidebarMenuSubButton>
+                          ) : (
+                            <SidebarMenuSubButton asChild>
+                              <a href={subItem.url}>
+                                <span>{subItem.title}</span>
+                              </a>
+                            </SidebarMenuSubButton>
+                          )}
                         </SidebarMenuSubItem>
                       ))}
                     </SidebarMenuSub>
