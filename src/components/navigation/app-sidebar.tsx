@@ -4,8 +4,8 @@ import {
   AppWindowIcon,
   CalendarIcon,
   CommandIcon,
+  ConciergeBellIcon,
   NotebookIcon,
-  PlaneIcon,
   SettingsIcon,
   UserPlusIcon,
   UsersIcon,
@@ -52,9 +52,31 @@ const data = {
       icon: CalendarIcon,
     },
     {
-      title: "SERVICIOS · Vuelos",
-      url: "/servicios/vuelos",
-      icon: PlaneIcon,
+      title: "Servicios",
+      url: "#",
+      icon: ConciergeBellIcon,
+      isActive: true,
+      items: [
+        {
+          title: "Vuelos",
+          url: "/servicios/vuelos",
+        },
+        {
+          title: "Hospedaje",
+          url: "#",
+          disabled: true,
+        },
+        {
+          title: "Rent a Car",
+          url: "#",
+          disabled: true,
+        },
+        {
+          title: "Atracciones",
+          url: "#",
+          disabled: true,
+        },
+      ],
     },
     {
       title: "Usuarios",
