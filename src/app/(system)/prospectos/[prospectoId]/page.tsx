@@ -1,8 +1,10 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ProspectoDetalle } from "@/components/system/prospectos/prospecto-detalle";
+import { ProspectoSeguimiento } from "@/components/system/prospectos/prospecto-seguimiento";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 
 export default async function ProspectoPage({
   params,
@@ -18,6 +20,10 @@ export default async function ProspectoPage({
   }
 
   const { prospectoId } = await params;
+  const prospecto = await db.prospecto.findFirst({
+    where: { id: prospectoId, deletedAt: null },
+    select: { convertido: true },
+  });
 
   return (
     <div className="flex-1">
@@ -27,6 +33,14 @@ export default async function ProspectoPage({
         </Button>
       </div>
       <ProspectoDetalle prospectoId={prospectoId} />
+      {prospecto && (
+        <div className="px-8 pb-8">
+          <ProspectoSeguimiento
+            prospectoId={prospectoId}
+            convertido={prospecto.convertido}
+          />
+        </div>
+      )}
     </div>
   );
 }
