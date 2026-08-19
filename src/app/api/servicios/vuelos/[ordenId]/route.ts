@@ -3,75 +3,7 @@ import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ensureVuelosSchema } from "@/lib/vuelos-schema";
-
-export async function PATCH(
-  request: Request,
-  { params }: { params: Promise<{ ordenId: string }> },
-) {
-  try {
-    await ensureVuelosSchema();
-
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
-
-    const { ordenId } = await params;
-    const body = await request.json();
-    const estado =
-      typeof body.estado === "string" ? body.estado.trim().toUpperCase() : "";
-
-    if (estado !== "DESPACHADA" && estado !== "PENDIENTE") {
-      return NextResponse.json(
-        { error: "Estado inválido" },
-        { status: 400 },
-      );
-    }
-
-    const existente = await db.$queryRaw<Array<{ id: string }>>`
-      SELECT "id"
-      FROM "orden_cotizacion_vuelo"
-      WHERE "id" = ${ordenId}
-      LIMIT 1
-    `;
-
-    if (!existente[0]) {
-      return NextResponse.json(
-        { error: "Orden no encontrada" },
-        { status: 404 },
-      );
-    }
-
-    const actualizado =
-      estado === "DESPACHADA"
-        ? await db.$queryRaw<Array<{ id: string; estado: string; despachadoAt: Date | null }>>`
-            UPDATE "orden_cotizacion_vuelo"
-            SET
-              "estado" = 'DESPACHADA',
-              "despachadoAt" = NOW(),
-              "updatedAt" = NOW()
-            WHERE "id" = ${ordenId}
-            RETURNING "id", "estado", "despachadoAt"
-          `
-        : await db.$queryRaw<Array<{ id: string; estado: string; despachadoAt: Date | null }>>`
-            UPDATE "orden_cotizacion_vuelo"
-            SET
-              "estado" = 'PENDIENTE',
-              "despachadoAt" = NULL,
-              "updatedAt" = NOW()
-            WHERE "id" = ${ordenId}
-            RETURNING "id", "estado", "despachadoAt"
-          `;
-
-    return NextResponse.json({ orden: actualizado[0] });
-  } catch (error) {
-    console.error("Error al actualizar orden de vuelo:", error);
-    return NextResponse.json(
-      { error: "No se pudo actualizar la orden" },
-      { status: 500 },
-    );
-  }
-}
+const METODOS=["EFECTIVO","TRANSFERENCIA","QR","TARJETA","OTRO"];
+export async function PATCH(request:Request,{params}:{params:Promise<{ordenId:string}>}){try{await ensureVuelosSchema();const session=await auth.api.getSession({headers:await headers()});if(!session?.user?.id)return NextResponse.json({error:"No autorizado"},{status:401});const{ordenId}=await params;const b=await request.json();const estado=typeof b.estado==="string"?b.estado.trim().toUpperCase():"";const ex=await db.$queryRaw<Array<{id:string;estado:string}>>`SELECT "id","estado" FROM "orden_cotizacion_vuelo" WHERE "id"=${ordenId} LIMIT 1`;if(!ex[0])return NextResponse.json({error:"Orden no encontrada"},{status:404});
+if(estado==="EMITIDA"){if(ex[0].estado!=="DESPACHADA")return NextResponse.json({error:"Primero la orden debe estar despachada"},{status:400});const monto=Number(b.montoVenta),moneda=b.monedaVenta==="USD"?"USD":b.monedaVenta==="BOB"?"BOB":"",metodo=typeof b.metodoPago==="string"?b.metodoPago.toUpperCase():"",obs=typeof b.observacionPago==="string"&&b.observacionPago.trim()?b.observacionPago.trim():null;if(!Number.isFinite(monto)||monto<=0)return NextResponse.json({error:"Ingresa un precio de venta válido"},{status:400});if(!moneda)return NextResponse.json({error:"Selecciona moneda"},{status:400});if(!METODOS.includes(metodo))return NextResponse.json({error:"Selecciona método de pago"},{status:400});const r=await db.$queryRaw`UPDATE "orden_cotizacion_vuelo" SET "estado"='EMITIDA',"montoVenta"=${monto},"monedaVenta"=${moneda},"metodoPago"=${metodo},"fechaEmision"=NOW(),"observacionPago"=${obs},"updatedAt"=NOW() WHERE "id"=${ordenId} RETURNING *`;return NextResponse.json({orden:(r as unknown[])[0]});}
+if(estado!=="DESPACHADA"&&estado!=="PENDIENTE")return NextResponse.json({error:"Estado inválido"},{status:400});if(ex[0].estado==="EMITIDA")return NextResponse.json({error:"Una venta emitida no puede volver a cotización"},{status:400});const r=estado==="DESPACHADA"?await db.$queryRaw`UPDATE "orden_cotizacion_vuelo" SET "estado"='DESPACHADA',"despachadoAt"=NOW(),"updatedAt"=NOW() WHERE "id"=${ordenId} RETURNING *`:await db.$queryRaw`UPDATE "orden_cotizacion_vuelo" SET "estado"='PENDIENTE',"despachadoAt"=NULL,"updatedAt"=NOW() WHERE "id"=${ordenId} RETURNING *`;return NextResponse.json({orden:(r as unknown[])[0]});}catch(e){console.error(e);return NextResponse.json({error:"No se pudo actualizar la orden"},{status:500})}}
