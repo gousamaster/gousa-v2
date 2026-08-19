@@ -6,6 +6,7 @@ import {
   CommandIcon,
   NotebookIcon,
   SettingsIcon,
+  UserPlusIcon,
   UsersIcon,
 } from "lucide-react";
 import type * as React from "react";
@@ -28,6 +29,11 @@ const data = {
       title: "Dashboard",
       url: "/dashboard",
       icon: AppWindowIcon,
+    },
+    {
+      title: "Prospectos",
+      url: "/prospectos",
+      icon: UserPlusIcon,
     },
     {
       title: "Clientes",
