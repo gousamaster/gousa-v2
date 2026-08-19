@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
+  analizarProspectoScore,
   calcularProspectoScore,
   PROSPECTO_SCORE_QUESTIONS,
   PROSPECTO_SCORE_VERSION,
@@ -22,6 +23,19 @@ type ScoreRow = {
   clasificacion: string;
   createdAt: Date;
 };
+
+function enrichEvaluation(row: ScoreRow | undefined) {
+  if (!row) return null;
+
+  return {
+    ...row,
+    analisis:
+      row.modeloVersion === PROSPECTO_SCORE_VERSION &&
+      validarRespuestasProspectoScore(row.respuestas)
+        ? analizarProspectoScore(row.respuestas)
+        : null,
+  };
+}
 
 export async function GET(
   _request: Request,
@@ -71,7 +85,7 @@ export async function GET(
         aviso:
           "Score NEXUS es un índice interno y orientativo de preparación del perfil. No es una probabilidad oficial de aprobación consular ni garantiza un resultado migratorio.",
       },
-      ultimaEvaluacion: rows[0] ?? null,
+      ultimaEvaluacion: enrichEvaluation(rows[0]),
       historial: rows,
     });
   } catch (error) {
@@ -115,6 +129,7 @@ export async function POST(
     }
 
     const resultado = calcularProspectoScore(respuestas);
+    const analisis = analizarProspectoScore(respuestas);
     const evaluacionId = randomUUID();
     const respuestasJson = JSON.stringify(respuestas);
 
@@ -151,6 +166,8 @@ export async function POST(
         score: resultado.score,
         clasificacion: resultado.clasificacion,
         modeloVersion: PROSPECTO_SCORE_VERSION,
+        respuestas,
+        analisis,
       },
     });
   } catch (error) {
