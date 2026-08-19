@@ -1,6 +1,6 @@
 // src/components/system/dashboard/dashboard-bienvenida.tsx
 
-import { BookOpen, CalendarCheck, FileText, Users } from "lucide-react";
+import { BookOpen, CalendarCheck, FileText, UserPlus, Users } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
 const ACCESOS_POR_ROL: Record<
@@ -13,6 +13,12 @@ const ACCESOS_POR_ROL: Record<
   }>
 > = {
   USER: [
+    {
+      icono: UserPlus,
+      titulo: "Prospectos",
+      descripcion: "Registra, califica y da seguimiento a prospectos",
+      href: "/prospectos",
+    },
     {
       icono: Users,
       titulo: "Clientes",
@@ -33,6 +39,12 @@ const ACCESOS_POR_ROL: Record<
     },
   ],
   SUPERVISOR: [
+    {
+      icono: UserPlus,
+      titulo: "Prospectos",
+      descripcion: "Supervisa prospectos y conversiones",
+      href: "/prospectos",
+    },
     {
       icono: Users,
       titulo: "Clientes",
