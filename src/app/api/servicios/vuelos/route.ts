@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { ensureVuelosSchema } from "@/lib/vuelos-schema";
 
 type OrdenVueloRow = {
   id: string;
@@ -29,6 +30,8 @@ function normalizarIata(value: unknown) {
 
 export async function GET(request: Request) {
   try {
+    await ensureVuelosSchema();
+
     const { searchParams } = new URL(request.url);
     const estado = searchParams.get("estado")?.toUpperCase();
 
@@ -99,6 +102,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   try {
+    await ensureVuelosSchema();
+
     const session = await auth.api.getSession({
       headers: await headers(),
     });
