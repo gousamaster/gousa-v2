@@ -2,6 +2,7 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import { DashboardAccesosComerciales } from "@/components/system/dashboard/dashboard-accesos-comerciales";
 import { DashboardBienvenida } from "@/components/system/dashboard/dashboard-bienvenida";
 import { DashboardContainer } from "@/components/system/dashboard/dashboard-container";
 import { auth } from "@/lib/auth";
@@ -26,7 +27,12 @@ export default async function DashboardPage() {
   const rol = session.user.role ?? "USER";
 
   if (esRolGerencial(rol)) {
-    return <DashboardContainer nombreUsuario={session.user.name} rol={rol} />;
+    return (
+      <div className="flex-1">
+        <DashboardAccesosComerciales />
+        <DashboardContainer nombreUsuario={session.user.name} rol={rol} />
+      </div>
+    );
   }
 
   return <DashboardBienvenida nombre={session.user.name} rol={rol} />;
