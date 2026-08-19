@@ -1,4 +1,4 @@
-export const PROSPECTO_SCORE_VERSION = "NEXUS-PROSPECTO-0.1";
+export const PROSPECTO_SCORE_VERSION = "NEXUS-PROSPECTO-0.2";
 
 export type ScoreOption = {
   value: string;
@@ -14,98 +14,251 @@ export type ScoreQuestion = {
   opciones: ScoreOption[];
 };
 
+/**
+ * Score NEXUS interno para prospectos de visa temporal B1/B2.
+ *
+ * No intenta predecir una decisión consular. La ponderación prioriza señales
+ * operativas alineadas con los factores que el Departamento de Estado indica
+ * que pueden ser relevantes para una visa de visitante: propósito temporal,
+ * intención de salida, vínculos fuera de EE.UU., capacidad de cubrir el viaje,
+ * elegibilidad para la categoría y consistencia de la información.
+ *
+ * No usa edad, sexo, raza, religión, discapacidad, estado civil u otras
+ * características protegidas como criterios de puntuación.
+ */
 export const PROSPECTO_SCORE_QUESTIONS: ScoreQuestion[] = [
   {
-    id: "motivo_viaje",
-    titulo: "Claridad del motivo de viaje",
-    ayuda: "Evalúa si el propósito del viaje está claro, es coherente y puede explicarse de forma sencilla.",
+    id: "proposito_categoria",
+    titulo: "Propósito del viaje y encaje con visa temporal",
+    ayuda:
+      "Evalúa si el motivo declarado es específico, temporal y compatible con una visita de negocios o turismo, sin asumir que eso garantiza elegibilidad.",
+    peso: 14,
+    opciones: [
+      {
+        value: "claro_compatible",
+        label: "Propósito claro, temporal y coherente con la categoría",
+        factor: 1,
+      },
+      {
+        value: "claro_revisar",
+        label: "Propósito entendible, pero requiere precisar actividades o categoría",
+        factor: 0.6,
+      },
+      {
+        value: "ambiguo",
+        label: "Propósito ambiguo o con actividades que deben revisarse antes de avanzar",
+        factor: 0.15,
+      },
+    ],
+  },
+  {
+    id: "plan_temporal",
+    titulo: "Plan, duración y lógica del viaje",
+    ayuda:
+      "Considera si duración, destino, actividades y fechas tentativas forman un plan temporal razonablemente coherente.",
+    peso: 8,
+    opciones: [
+      { value: "coherente", label: "Plan definido y coherente con el motivo", factor: 1 },
+      { value: "parcial", label: "Plan general definido, con detalles pendientes", factor: 0.6 },
+      { value: "inconsistente", label: "Duración o actividades todavía no son coherentes", factor: 0.15 },
+    ],
+  },
+  {
+    id: "vinculos_retorno",
+    titulo: "Vínculos y compromisos objetivos de retorno",
+    ayuda:
+      "Considera compromisos verificables fuera de EE.UU., como trabajo, negocio, estudios, vivienda, responsabilidades económicas o personales. No puntúa el tipo de familia ni el estado civil.",
+    peso: 20,
+    opciones: [
+      {
+        value: "multiples",
+        label: "Existen varios compromisos claros, actuales y verificables",
+        factor: 1,
+      },
+      {
+        value: "uno_solido",
+        label: "Existe al menos un compromiso importante y verificable",
+        factor: 0.7,
+      },
+      {
+        value: "limitados",
+        label: "Los compromisos existen, pero son débiles o poco documentados",
+        factor: 0.35,
+      },
+      {
+        value: "sin_evidencia",
+        label: "Todavía no se identifican compromisos objetivos verificables",
+        factor: 0,
+      },
+    ],
+  },
+  {
+    id: "continuidad_actividad",
+    titulo: "Continuidad laboral, empresarial o académica",
+    ayuda:
+      "Mide estabilidad y posibilidad de verificación de la actividad actual, sin asignar valor por profesión, cargo o nivel educativo.",
+    peso: 12,
+    opciones: [
+      {
+        value: "estable",
+        label: "Actividad estable y verificable por 12 meses o más",
+        factor: 1,
+      },
+      {
+        value: "consolidando",
+        label: "Actividad verificable entre 3 y 12 meses",
+        factor: 0.7,
+      },
+      {
+        value: "reciente",
+        label: "Actividad reciente o documentación aún incompleta",
+        factor: 0.4,
+      },
+      {
+        value: "no_aplica_documentado",
+        label: "No tiene actividad actual, pero la situación está claramente explicada y documentada",
+        factor: 0.45,
+      },
+      {
+        value: "sin_datos",
+        label: "No hay información suficiente para verificar la situación actual",
+        factor: 0.1,
+      },
+    ],
+  },
+  {
+    id: "capacidad_costos",
+    titulo: "Capacidad para cubrir los costos del viaje",
+    ayuda:
+      "Evalúa si el presupuesto del viaje puede explicarse y respaldarse, ya sea con recursos propios o con apoyo de un tercero claramente documentado.",
+    peso: 12,
+    opciones: [
+      {
+        value: "propios_suficientes",
+        label: "Recursos propios suficientes y coherentes con el viaje",
+        factor: 1,
+      },
+      {
+        value: "tercero_documentado",
+        label: "Parte o todo será cubierto por un tercero y el apoyo está claramente documentado",
+        factor: 0.85,
+      },
+      {
+        value: "parcial",
+        label: "Hay recursos, pero falta sustento o el presupuesto requiere ajuste",
+        factor: 0.45,
+      },
+      {
+        value: "sin_respaldo",
+        label: "Todavía no existe un respaldo económico identificable",
+        factor: 0.05,
+      },
+    ],
+  },
+  {
+    id: "consistencia_global",
+    titulo: "Consistencia entre historia, formulario y documentos",
+    ayuda:
+      "Compara lo declarado sobre viaje, actividad, recursos y antecedentes para identificar contradicciones materiales o vacíos que deben corregirse.",
+    peso: 12,
+    opciones: [
+      {
+        value: "consistente",
+        label: "La información es consistente y los respaldos principales coinciden",
+        factor: 1,
+      },
+      {
+        value: "vacíos_menores",
+        label: "Hay vacíos menores corregibles sin cambiar la historia principal",
+        factor: 0.7,
+      },
+      {
+        value: "inconsistencias",
+        label: "Hay inconsistencias relevantes que deben resolverse antes de avanzar",
+        factor: 0.2,
+      },
+    ],
+  },
+  {
+    id: "cumplimiento_migratorio",
+    titulo: "Antecedentes de cumplimiento migratorio",
+    ayuda:
+      "Revisa sobreestadías, trabajo no autorizado, remoción, fraude u otros antecedentes relevantes. No tener viajes previos no reduce el puntaje.",
     peso: 10,
     opciones: [
-      { value: "claro", label: "Claro, coherente y bien definido", factor: 1 },
-      { value: "general", label: "Existe una idea general, pero necesita precisión", factor: 0.5 },
-      { value: "incierto", label: "No está claro todavía", factor: 0 },
+      {
+        value: "sin_incidentes",
+        label: "No se conocen incidentes migratorios relevantes",
+        factor: 1,
+      },
+      {
+        value: "sin_historial",
+        label: "No tiene historial migratorio previo que evaluar",
+        factor: 1,
+      },
+      {
+        value: "incidente_resuelto",
+        label: "Existe un antecedente, pero está identificado y requiere análisis específico",
+        factor: 0.45,
+      },
+      {
+        value: "riesgo_legal",
+        label: "Existe un posible impedimento o antecedente serio que requiere revisión profesional antes de continuar",
+        factor: 0,
+      },
     ],
   },
   {
-    id: "estabilidad_actividad",
-    titulo: "Estabilidad laboral, empresarial o académica",
-    ayuda: "Considera continuidad y estabilidad en trabajo, negocio o estudios, sin evaluar profesión ni nivel educativo.",
-    peso: 15,
+    id: "rechazos_cambios",
+    titulo: "Rechazos previos y cambios de circunstancias",
+    ayuda:
+      "Un rechazo previo no descalifica automáticamente. Si existió uno, evalúa si se comprende la razón y si hay cambios relevantes o mejor evidencia desde entonces.",
+    peso: 5,
     opciones: [
-      { value: "alta", label: "Actividad estable y verificable por más de 12 meses", factor: 1 },
-      { value: "media", label: "Actividad verificable entre 3 y 12 meses", factor: 0.65 },
-      { value: "baja", label: "Actividad reciente o parcialmente verificable", factor: 0.35 },
-      { value: "sin_datos", label: "Sin actividad verificable actualmente", factor: 0 },
-    ],
-  },
-  {
-    id: "capacidad_economica",
-    titulo: "Capacidad económica para el viaje",
-    ayuda: "Evalúa si existen recursos propios o apoyo documentado suficiente para cubrir el viaje declarado.",
-    peso: 15,
-    opciones: [
-      { value: "suficiente", label: "Recursos suficientes y verificables", factor: 1 },
-      { value: "apoyo", label: "Apoyo de tercero o patrocinador claramente documentado", factor: 0.7 },
-      { value: "limitada", label: "Recursos limitados o documentación incompleta", factor: 0.35 },
-      { value: "sin_respaldo", label: "Sin respaldo económico identificable", factor: 0 },
-    ],
-  },
-  {
-    id: "arraigo",
-    titulo: "Vínculos y responsabilidades de retorno",
-    ayuda: "Considera trabajo, negocio, estudios, bienes, responsabilidades u otros compromisos objetivos en el país de residencia.",
-    peso: 15,
-    opciones: [
-      { value: "fuerte", label: "Múltiples vínculos claros y verificables", factor: 1 },
-      { value: "moderado", label: "Al menos un vínculo importante y verificable", factor: 0.65 },
-      { value: "debil", label: "Vínculos limitados o poco documentados", factor: 0.3 },
-      { value: "sin_datos", label: "No se identifican vínculos verificables", factor: 0 },
-    ],
-  },
-  {
-    id: "historial_viajes",
-    titulo: "Historial de viajes y cumplimiento",
-    ayuda: "Valora antecedentes de viajes y cumplimiento de tiempos autorizados. No tener viajes previos no se considera una falta.",
-    peso: 10,
-    opciones: [
-      { value: "cumplido", label: "Tiene viajes previos y cumplió las condiciones", factor: 1 },
-      { value: "sin_viajes", label: "No tiene viajes internacionales previos", factor: 0.6 },
-      { value: "dudas", label: "Hay información incompleta o dudas por revisar", factor: 0.3 },
-      { value: "incumplimiento", label: "Existe un incumplimiento migratorio relevante", factor: 0 },
-    ],
-  },
-  {
-    id: "antecedentes_migratorios",
-    titulo: "Antecedentes migratorios hacia Estados Unidos",
-    ayuda: "Evalúa únicamente la claridad y resolución de antecedentes migratorios, no penaliza automáticamente un rechazo previo.",
-    peso: 15,
-    opciones: [
-      { value: "sin_incidentes", label: "Sin incidentes migratorios conocidos", factor: 1 },
-      { value: "rechazo_explicado", label: "Tuvo rechazo previo, pero la situación está clara y documentada", factor: 0.65 },
-      { value: "pendiente_revision", label: "Hay antecedentes que requieren revisión adicional", factor: 0.3 },
-      { value: "incumplimiento_grave", label: "Existe un antecedente migratorio grave no resuelto", factor: 0 },
-    ],
-  },
-  {
-    id: "consistencia_documental",
-    titulo: "Consistencia de la información y documentos",
-    ayuda: "Compara la historia declarada con los documentos disponibles para detectar vacíos o contradicciones.",
-    peso: 10,
-    opciones: [
-      { value: "consistente", label: "Información consistente y respaldada", factor: 1 },
-      { value: "ajustes", label: "Hay vacíos menores que pueden corregirse", factor: 0.6 },
-      { value: "contradicciones", label: "Existen contradicciones relevantes por resolver", factor: 0.15 },
+      {
+        value: "sin_rechazo",
+        label: "No registra rechazo previo conocido",
+        factor: 1,
+      },
+      {
+        value: "rechazo_con_cambios",
+        label: "Hubo rechazo previo y existen cambios o nueva evidencia relevante",
+        factor: 0.8,
+      },
+      {
+        value: "rechazo_sin_cambios",
+        label: "Hubo rechazo previo y las circunstancias relevantes siguen prácticamente iguales",
+        factor: 0.35,
+      },
+      {
+        value: "motivo_desconocido",
+        label: "Hubo rechazo, pero todavía no se conoce o entiende suficientemente el motivo",
+        factor: 0.2,
+      },
     ],
   },
   {
     id: "preparacion_entrevista",
-    titulo: "Preparación para explicar su caso",
-    ayuda: "Evalúa si el prospecto puede responder de forma clara, breve y consistente sobre su viaje y situación personal.",
-    peso: 10,
+    titulo: "Preparación para explicar el caso con claridad",
+    ayuda:
+      "Evalúa si el prospecto puede explicar de forma breve y consistente el propósito, duración, financiamiento y razones de retorno, sin memorizar respuestas artificiales.",
+    peso: 7,
     opciones: [
-      { value: "preparado", label: "Explica su caso con claridad y consistencia", factor: 1 },
-      { value: "requiere_practica", label: "Necesita práctica o estructura adicional", factor: 0.6 },
-      { value: "inconsistente", label: "Presenta respuestas confusas o contradictorias", factor: 0.15 },
+      {
+        value: "preparado",
+        label: "Responde con claridad, naturalidad y consistencia",
+        factor: 1,
+      },
+      {
+        value: "requiere_practica",
+        label: "La historia es consistente, pero necesita práctica y mejor estructura",
+        factor: 0.65,
+      },
+      {
+        value: "confuso",
+        label: "Las respuestas son confusas o cambian al repreguntar",
+        factor: 0.2,
+      },
     ],
   },
 ];
@@ -135,9 +288,9 @@ export function calcularProspectoScore(respuestas: ProspectoScoreAnswers) {
 }
 
 export function clasificarProspectoScore(score: number) {
-  if (score >= 80) return "ALTO";
-  if (score >= 60) return "MEDIO_ALTO";
-  if (score >= 40) return "MEDIO";
+  if (score >= 82) return "ALTO";
+  if (score >= 65) return "MEDIO_ALTO";
+  if (score >= 45) return "MEDIO";
   return "BAJO";
 }
 
