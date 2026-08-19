@@ -7,6 +7,7 @@ import { Plane, FileDown, CheckCircle2, RefreshCcw, Plus, Search } from "lucide-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { AirportPicker } from "@/components/system/servicios/vuelos/airport-picker";
 
 type Prospecto = {
   id: string;
@@ -263,7 +264,7 @@ export function VuelosContainer() {
         </div>
       )}
 
-      <div className="grid gap-6 xl:grid-cols-[380px_1fr]">
+      <div className="grid gap-6 xl:grid-cols-[420px_1fr]">
         <Card className="h-fit">
           <CardHeader>
             <CardTitle className="flex items-center gap-2 text-lg">
@@ -299,30 +300,30 @@ export function VuelosContainer() {
                 </p>
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium" htmlFor="origen">Origen</label>
-                  <Input
-                    id="origen"
-                    value={form.origen}
-                    onChange={(e) => setForm((prev) => ({ ...prev, origen: e.target.value.toUpperCase().slice(0, 3) }))}
-                    placeholder="LPB"
-                    maxLength={3}
-                    required
-                  />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-sm font-medium" htmlFor="destino">Destino</label>
-                  <Input
-                    id="destino"
-                    value={form.destino}
-                    onChange={(e) => setForm((prev) => ({ ...prev, destino: e.target.value.toUpperCase().slice(0, 3) }))}
-                    placeholder="MIA"
-                    maxLength={3}
-                    required
-                  />
-                </div>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <AirportPicker
+                  id="origen"
+                  label="Origen"
+                  value={form.origen}
+                  onChange={(iata) => setForm((prev) => ({ ...prev, origen: iata }))}
+                  placeholder="La Paz o LPB"
+                  excludeIata={form.destino}
+                  required
+                />
+                <AirportPicker
+                  id="destino"
+                  label="Destino"
+                  value={form.destino}
+                  onChange={(iata) => setForm((prev) => ({ ...prev, destino: iata }))}
+                  placeholder="Miami o MIA"
+                  excludeIata={form.origen}
+                  required
+                />
               </div>
+
+              <p className="-mt-1 text-xs text-muted-foreground">
+                Busca por ciudad, nombre del aeropuerto o código IATA y selecciona una opción.
+              </p>
 
               <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
@@ -387,7 +388,7 @@ export function VuelosContainer() {
                 />
               </div>
 
-              <Button type="submit" className="w-full" disabled={saving}>
+              <Button type="submit" className="w-full" disabled={saving || !form.origen || !form.destino}>
                 {saving ? "Generando…" : "Generar orden de cotización"}
               </Button>
             </form>
