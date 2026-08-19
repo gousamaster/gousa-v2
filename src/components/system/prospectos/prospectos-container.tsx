@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -42,6 +43,7 @@ const initialForm = {
 };
 
 export function ProspectosContainer() {
+  const router = useRouter();
   const [prospectos, setProspectos] = useState<Prospecto[]>([]);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
@@ -284,9 +286,10 @@ export function ProspectosContainer() {
             <div className="space-y-3">
               {prospectos.map((prospecto) => (
                 <div
-                  key={prospecto.id}
-                  className="flex flex-col gap-2 rounded-lg border p-4 md:flex-row md:items-center md:justify-between"
-                >
+  key={prospecto.id}
+  onClick={() => router.push(`/prospectos/${prospecto.id}`)}
+  className="flex cursor-pointer flex-col gap-2 rounded-lg border p-4 transition-colors hover:bg-muted/50 md:flex-row md:items-center md:justify-between"
+>
                   <div>
                     <p className="font-medium">
                       {prospecto.nombres} {prospecto.apellidos ?? ""}
