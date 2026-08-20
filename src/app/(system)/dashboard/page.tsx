@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { DashboardBienvenida } from "@/components/system/dashboard/dashboard-bienvenida";
 import { DashboardContainer } from "@/components/system/dashboard/dashboard-container";
 import { EntrevistasHoyCard } from "@/components/system/dashboard/entrevistas-hoy-card";
+import { AgendaHoyCard } from "@/components/system/dashboard/agenda-hoy-card";
 import { auth } from "@/lib/auth";
 
 const ROLES_GERENCIALES = ["MANAGER", "ADMIN", "SUPER_ADMIN"] as const;
@@ -29,8 +30,9 @@ export default async function DashboardPage() {
   if (esRolGerencial(rol)) {
     return (
       <div className="flex-1">
-        <div className="px-8 pt-6">
+        <div className="space-y-4 px-8 pt-6">
           <EntrevistasHoyCard />
+          <AgendaHoyCard />
         </div>
         <DashboardContainer nombreUsuario={session.user.name} rol={rol} />
       </div>
@@ -39,8 +41,9 @@ export default async function DashboardPage() {
 
   return (
     <div className="flex-1">
-      <div className="px-8 pt-6">
+      <div className="space-y-4 px-8 pt-6">
         <EntrevistasHoyCard />
+        <AgendaHoyCard />
       </div>
       <DashboardBienvenida nombre={session.user.name} rol={rol} />
     </div>
