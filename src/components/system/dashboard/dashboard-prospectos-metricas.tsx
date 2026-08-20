@@ -13,10 +13,13 @@ import {
 } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/db";
+import { etiquetaOrigenProspecto } from "@/lib/prospectos/origenes";
 
 type SeguimientoMetricasRow = { pendientes: bigint; vencidos: bigint; proximas24h: bigint };
 type EmbudoRow = { estado: string; total: bigint };
 type PerdidaRow = { motivo: string; total: bigint };
+type FuenteRow = { origen: string; total: bigint; convertidos: bigint };
+type RespuestaRow = { promedioMinutos: number | null; conContacto: bigint; sinContacto: bigint };
 type AtencionRow = {
   id: string; nombres: string; apellidos: string | null; score: number | null;
   accion: string | null; programadoAt: Date | null; vencido: boolean;
@@ -27,12 +30,21 @@ function formatDate(value: Date | null) {
   if (!value) return "Sin próxima acción";
   return new Date(value).toLocaleString("es-BO", { dateStyle: "medium", timeStyle: "short" });
 }
+function formatTiempo(minutos: number | null | undefined) {
+  if (minutos == null || !Number.isFinite(Number(minutos))) return "—";
+  const value = Number(minutos);
+  if (value < 60) return `${Math.round(value)} min`;
+  const horas = Math.round((value / 60) * 10) / 10;
+  if (horas < 24) return `${horas} h`;
+  return `${Math.round((horas / 24) * 10) / 10} días`;
+}
 
 export async function DashboardProspectosMetricas() {
   const base = { deletedAt: null } as const;
   const activos = { ...base, convertido: false } as const;
   const [total, nuevos, seguimiento, convertidos, evaluados, sinEvaluar, altaPrioridad, scoreAggregate,
-    seguimientoRows, altaSinSeguimientoRows, atencion, embudoRows, perdidosRows, motivosPerdida] = await Promise.all([
+    seguimientoRows, altaSinSeguimientoRows, atencion, embudoRows, perdidosRows, motivosPerdida,
+    fuentesRows, respuestaRows] = await Promise.all([
     db.prospecto.count({ where: base }),
     db.prospecto.count({ where: { ...activos, estado: "NUEVO" } }),
     db.prospecto.count({ where: { ...activos, estado: { in: ["CONTACTADO", "CALIFICADO", "SEGUIMIENTO"] } } }),
@@ -47,6 +59,8 @@ export async function DashboardProspectosMetricas() {
     db.$queryRaw<EmbudoRow[]>`SELECT "estado",COUNT(*) AS "total" FROM "prospecto" WHERE "deletedAt" IS NULL AND "convertido"=false GROUP BY "estado"`,
     db.$queryRaw<{ total: bigint }[]>`SELECT COUNT(*) AS "total" FROM "prospecto" WHERE "deletedAt" IS NULL AND "convertido"=false AND "estado"='PERDIDO'`,
     db.$queryRaw<PerdidaRow[]>`SELECT COALESCE(NULLIF(TRIM("motivo_perdida"),''),'Sin motivo') AS "motivo",COUNT(*) AS "total" FROM "prospecto" WHERE "deletedAt" IS NULL AND "convertido"=false AND "estado"='PERDIDO' GROUP BY 1 ORDER BY "total" DESC,"motivo" ASC LIMIT 5`,
+    db.$queryRaw<FuenteRow[]>`SELECT COALESCE(NULLIF(TRIM("origen"),''),'SIN_DEFINIR') AS "origen", COUNT(*) AS "total", COUNT(*) FILTER (WHERE "convertido"=true) AS "convertidos" FROM "prospecto" WHERE "deletedAt" IS NULL GROUP BY 1 ORDER BY "total" DESC,"origen" ASC LIMIT 8`,
+    db.$queryRaw<RespuestaRow[]>`SELECT AVG(EXTRACT(EPOCH FROM ("primer_contacto_at"-"createdAt"))/60.0)::float8 AS "promedioMinutos", COUNT(*) FILTER (WHERE "primer_contacto_at" IS NOT NULL) AS "conContacto", COUNT(*) FILTER (WHERE "primer_contacto_at" IS NULL AND "convertido"=false AND "estado"<>'PERDIDO') AS "sinContacto" FROM "prospecto" WHERE "deletedAt" IS NULL`,
   ]);
 
   const tasaConversion = total > 0 ? Math.round((convertidos / total) * 100) : 0;
@@ -56,6 +70,7 @@ export async function DashboardProspectosMetricas() {
   const proximas24h = numero(seguimientoRows[0]?.proximas24h);
   const altaSinSeguimiento = numero(altaSinSeguimientoRows[0]?.total);
   const perdidos = numero(perdidosRows[0]?.total);
+  const respuesta = respuestaRows[0];
   const porEstado = Object.fromEntries(embudoRows.map((r) => [r.estado, numero(r.total)]));
   const etapas = [
     ["NUEVO", "Nuevos"], ["CONTACTADO", "Contactados"], ["CALIFICADO", "Calificados"],
@@ -87,6 +102,11 @@ export async function DashboardProspectosMetricas() {
     <Card><CardHeader><CardTitle className="text-base">Embudo comercial</CardTitle><p className="text-sm text-muted-foreground">Distribución actual por etapa. Los convertidos se cuentan aparte para no mezclarlos con prospectos activos.</p></CardHeader><CardContent className="space-y-5">
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{etapas.map(([estado,label]) => { const valor = estado === "CONVERTIDO" ? convertidos : (porEstado[estado] ?? 0); const pct = total > 0 ? Math.round((valor/total)*100) : 0; return <div key={estado} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-bold">{valor}</p><p className="text-xs text-muted-foreground">{pct}% del total</p></div>; })}</div>
       <div><p className="mb-2 text-sm font-medium">Principales motivos de pérdida</p>{motivosPerdida.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay prospectos perdidos.</p> : <div className="space-y-2">{motivosPerdida.map((item) => <div key={item.motivo} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"><span>{item.motivo}</span><span className="font-semibold">{numero(item.total)}</span></div>)}</div>}</div>
+    </CardContent></Card>
+
+    <Card><CardHeader><CardTitle className="text-base">Adquisición y velocidad de atención</CardTitle><p className="text-sm text-muted-foreground">De dónde llegan los prospectos y cuánto tarda el equipo en realizar el primer contacto efectivo.</p></CardHeader><CardContent className="space-y-5">
+      <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Tiempo medio al primer contacto</p><p className="mt-1 text-2xl font-bold">{formatTiempo(respuesta?.promedioMinutos)}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Con primer contacto registrado</p><p className="mt-1 text-2xl font-bold">{numero(respuesta?.conContacto)}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Activos sin primer contacto</p><p className="mt-1 text-2xl font-bold">{numero(respuesta?.sinContacto)}</p></div></div>
+      <div><p className="mb-2 text-sm font-medium">Fuentes de prospectos</p>{fuentesRows.length===0?<p className="text-sm text-muted-foreground">Todavía no hay fuentes registradas.</p>:<div className="space-y-2">{fuentesRows.map(item=>{const totalFuente=numero(item.total);const convertidosFuente=numero(item.convertidos);const conversion=totalFuente>0?Math.round((convertidosFuente/totalFuente)*100):0;return <div key={item.origen} className="flex flex-col gap-1 rounded-md border px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span>{item.origen==="SIN_DEFINIR"?"Sin definir":etiquetaOrigenProspecto(item.origen)}</span><span className="text-muted-foreground">{totalFuente} prospecto{totalFuente===1?"":"s"} · {convertidosFuente} convertido{convertidosFuente===1?"":"s"} · {conversion}% conversión</span></div>})}</div>}</div>
     </CardContent></Card>
 
     <div><div className="mb-3"><h2 className="text-lg font-semibold">Agenda comercial NEXUS</h2><p className="text-sm text-muted-foreground">Lo que el equipo debe atender para que ningún prospecto se enfríe.</p></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{operativas.map(([titulo,valor,detalle,Icono]) => <Card key={titulo}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{titulo}</CardTitle><Icono className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{valor}</div><p className="mt-1 text-xs text-muted-foreground">{detalle}</p></CardContent></Card>)}</div></div>
