@@ -28,7 +28,7 @@ export async function GET() {
       LEFT JOIN "cita_resultado_consular" rc ON rc."citaId" = c."id"
       WHERE c."deletedAt" IS NULL
         AND (LOWER(tc."nombre") LIKE '%entrevista%' OR LOWER(tc."codigo") LIKE '%entrevista%' OR LOWER(tc."nombre") LIKE '%consular%' OR LOWER(tc."nombre") LIKE '%embajada%')
-        AND (c."fechaHora" AT TIME ZONE 'America/La_Paz')::date = (NOW() AT TIME ZONE 'America/La_Paz')::date
+        AND (c."fechaHora" - INTERVAL '4 hours')::date = (NOW() AT TIME ZONE 'America/La_Paz')::date
       ORDER BY c."fechaHora" ASC`;
 
     const entrevistas = rows.map((r) => ({
