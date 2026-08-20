@@ -7,6 +7,13 @@ import { detectarProspectoDuplicado } from "@/lib/prospectos/deduplicacion";
 import { alcanceProspectos, idsProspectosAsignados } from "@/lib/prospectos/permisos";
 import { registrarAuditoriaProspecto } from "@/lib/prospectos/auditoria";
 
+type ResponsableActualRow = {
+  prospectoId: string;
+  responsableId: string | null;
+  responsableNombre: string | null;
+  programadoAt: Date;
+};
+
 export async function GET() {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
@@ -24,16 +31,58 @@ export async function GET() {
           ],
         };
 
-    const prospectos = await db.prospecto.findMany({
-      where,
-      orderBy: { createdAt: "desc" },
-      include: {
-        creadoPor: { select: { id: true, name: true, email: true } },
-        convertidoPor: { select: { id: true, name: true, email: true } },
-        cliente: { select: { id: true, nombres: true, apellidos: true } },
-      },
-    });
-    return NextResponse.json({ prospectos });
+    const responsablesWhere = alcance.accesoTotal
+      ? { status: "ACTIVE", banned: { not: true } }
+      : { id: { in: alcance.userIds }, status: "ACTIVE", banned: { not: true } };
+
+    const [prospectosBase, responsables, responsablesActuales] = await Promise.all([
+      db.prospecto.findMany({
+        where,
+        orderBy: { createdAt: "desc" },
+        include: {
+          creadoPor: { select: { id: true, name: true, email: true } },
+          convertidoPor: { select: { id: true, name: true, email: true } },
+          cliente: { select: { id: true, nombres: true, apellidos: true } },
+        },
+      }),
+      db.user.findMany({
+        where: responsablesWhere,
+        orderBy: { name: "asc" },
+        select: { id: true, name: true, email: true },
+      }),
+      db.$queryRaw<ResponsableActualRow[]>`
+        SELECT DISTINCT ON (s."prospecto_id")
+          s."prospecto_id" AS "prospectoId",
+          s."responsable_id" AS "responsableId",
+          u."name" AS "responsableNombre",
+          s."programado_at" AS "programadoAt"
+        FROM "prospecto_seguimiento" s
+        LEFT JOIN "user" u ON u."id" = s."responsable_id"
+        WHERE s."estado" = 'PENDIENTE'
+        ORDER BY s."prospecto_id", s."programado_at" ASC
+      `,
+    ]);
+
+    const idsVisibles = new Set(prospectosBase.map((prospecto) => prospecto.id));
+    const responsablePorProspecto = new Map(
+      responsablesActuales
+        .filter((item) => idsVisibles.has(item.prospectoId))
+        .map((item) => [
+          item.prospectoId,
+          {
+            id: item.responsableId,
+            name: item.responsableNombre,
+            programadoAt: item.programadoAt,
+          },
+        ]),
+    );
+
+    const prospectos = prospectosBase.map((prospecto) => ({
+      ...prospecto,
+      responsableActual: responsablePorProspecto.get(prospecto.id) ?? null,
+    }));
+
+    return NextResponse.json({ prospectos, responsables });
   } catch (error) {
     console.error("Error al obtener prospectos:", error);
     return NextResponse.json({ error: "No se pudieron obtener los prospectos" }, { status: 500 });
