@@ -9,49 +9,21 @@ export async function POST(
   { params }: { params: Promise<{ prospectoId: string }> },
 ) {
   try {
-    const session = await auth.api.getSession({
-      headers: await headers(),
-    });
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: "No autorizado" }, { status: 401 });
-    }
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const { prospectoId } = await params;
     const body = await request.json();
     const regionId = typeof body.regionId === "string" ? body.regionId.trim() : "";
-
-    if (!regionId) {
-      return NextResponse.json(
-        { error: "La región es obligatoria para convertir el prospecto" },
-        { status: 400 },
-      );
-    }
+    if (!regionId) return NextResponse.json({ error: "La región es obligatoria para convertir el prospecto" }, { status: 400 });
 
     const [prospecto, region] = await Promise.all([
-      db.prospecto.findFirst({
-        where: { id: prospectoId, deletedAt: null },
-      }),
-      db.region.findFirst({
-        where: { id: regionId, activo: true },
-        select: { id: true },
-      }),
+      db.prospecto.findFirst({ where: { id: prospectoId, deletedAt: null } }),
+      db.region.findFirst({ where: { id: regionId, activo: true }, select: { id: true } }),
     ]);
-
-    if (!prospecto) {
-      return NextResponse.json({ error: "Prospecto no encontrado" }, { status: 404 });
-    }
-
-    if (!region) {
-      return NextResponse.json({ error: "Región no válida" }, { status: 400 });
-    }
-
-    if (prospecto.convertido || prospecto.clienteId) {
-      return NextResponse.json(
-        { error: "Este prospecto ya fue convertido en cliente" },
-        { status: 409 },
-      );
-    }
+    if (!prospecto) return NextResponse.json({ error: "Prospecto no encontrado" }, { status: 404 });
+    if (!region) return NextResponse.json({ error: "Región no válida" }, { status: 400 });
+    if (prospecto.convertido || prospecto.clienteId) return NextResponse.json({ error: "Este prospecto ya fue convertido en cliente" }, { status: 409 });
 
     const resultado = await db.$transaction(async (tx) => {
       const cliente = await tx.cliente.create({
@@ -64,11 +36,7 @@ export async function POST(
           regionId,
           registradoPorId: session.user.id,
         },
-        select: {
-          id: true,
-          nombres: true,
-          apellidos: true,
-        },
+        select: { id: true, nombres: true, apellidos: true },
       });
 
       const prospectoActualizado = await tx.prospecto.update({
@@ -81,17 +49,17 @@ export async function POST(
           convertidoAt: new Date(),
         },
         include: {
-          creadoPor: {
-            select: { id: true, name: true, email: true },
-          },
-          convertidoPor: {
-            select: { id: true, name: true, email: true },
-          },
-          cliente: {
-            select: { id: true, nombres: true, apellidos: true },
-          },
+          creadoPor: { select: { id: true, name: true, email: true } },
+          convertidoPor: { select: { id: true, name: true, email: true } },
+          cliente: { select: { id: true, nombres: true, apellidos: true } },
         },
       });
+
+      await tx.$executeRaw`
+        UPDATE "prospecto"
+        SET "primer_contacto_at" = COALESCE("primer_contacto_at", CURRENT_TIMESTAMP)
+        WHERE "id" = ${prospecto.id}
+      `;
 
       const historialId = randomUUID();
       await tx.$executeRaw`
@@ -107,9 +75,6 @@ export async function POST(
     return NextResponse.json(resultado, { status: 201 });
   } catch (error) {
     console.error("Error al convertir prospecto:", error);
-    return NextResponse.json(
-      { error: "No se pudo convertir el prospecto en cliente" },
-      { status: 500 },
-    );
+    return NextResponse.json({ error: "No se pudo convertir el prospecto en cliente" }, { status: 500 });
   }
 }
