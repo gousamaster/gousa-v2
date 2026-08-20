@@ -16,6 +16,13 @@ type Prospecto = {
   createdAt: string; creadoPor?: { id: string; name: string; email: string } | null;
 };
 
+type Duplicado = {
+  id: string;
+  nombre: string;
+  coincidencia: "TELEFONO" | "EMAIL" | "TELEFONO_EMAIL";
+  convertido: boolean;
+};
+
 const initialForm = {
   nombres: "", apellidos: "", telefono: "", email: "", ciudad: "", pais: "Bolivia",
   origen: "", origenDetalle: "", interes: "", observaciones: "",
@@ -39,6 +46,7 @@ export function ProspectosContainer() {
   const [loading, setLoading] = useState(true); const [showForm, setShowForm] = useState(false);
   const [saving, setSaving] = useState(false); const [form, setForm] = useState(initialForm);
   const [error, setError] = useState(""); const [filtro, setFiltro] = useState("TODOS");
+  const [duplicado, setDuplicado] = useState<Duplicado | null>(null);
 
   const loadProspectos = async () => {
     try { setLoading(true); const response = await fetch("/api/prospectos", { cache: "no-store" }); const data = await response.json();
@@ -55,18 +63,30 @@ export function ProspectosContainer() {
 
   const handleChange = (event: React.ChangeEvent<HTMLInputElement> | React.ChangeEvent<HTMLTextAreaElement>) => {
     const { name, value } = event.target; setForm(current => ({ ...current, [name]: value }));
+    setDuplicado(null);
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
-    event.preventDefault(); setError("");
+    event.preventDefault(); setError(""); setDuplicado(null);
     if (!form.nombres.trim() || !form.telefono.trim()) return setError("Nombre y teléfono son obligatorios");
-    try { setSaving(true); const response=await fetch("/api/prospectos",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)}); const data=await response.json();
-      if(!response.ok) throw new Error(data.error||"No se pudo crear el prospecto"); setForm(initialForm); setShowForm(false); await loadProspectos();
+    try {
+      setSaving(true);
+      const response=await fetch("/api/prospectos",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(form)});
+      const data=await response.json();
+      if(!response.ok) {
+        if (response.status === 409 && data.code === "PROSPECTO_DUPLICADO" && data.duplicado) {
+          setDuplicado(data.duplicado);
+          setError(data.error || "Ya existe un prospecto con esos datos.");
+          return;
+        }
+        throw new Error(data.error||"No se pudo crear el prospecto");
+      }
+      setForm(initialForm); setShowForm(false); await loadProspectos();
     } catch(err){ console.error(err); setError(err instanceof Error?err.message:"No se pudo crear el prospecto"); } finally { setSaving(false); }
   };
 
   return <div className="flex-1 space-y-6 p-8 pt-6">
-    <div className="flex items-center justify-between"><div><h2 className="text-3xl font-bold tracking-tight">Prospectos</h2><p className="text-muted-foreground">Registra, evalúa y prioriza personas antes de convertirlas en clientes.</p></div><Button onClick={()=>setShowForm(v=>!v)}>{showForm?"Cancelar":"Nuevo prospecto"}</Button></div>
+    <div className="flex items-center justify-between"><div><h2 className="text-3xl font-bold tracking-tight">Prospectos</h2><p className="text-muted-foreground">Registra, evalúa y prioriza personas antes de convertirlas en clientes.</p></div><Button onClick={()=>{setShowForm(v=>!v);setDuplicado(null);setError("");}}>{showForm?"Cancelar":"Nuevo prospecto"}</Button></div>
 
     {showForm && <Card><CardHeader><CardTitle>Nuevo prospecto</CardTitle></CardHeader><CardContent><form onSubmit={handleSubmit} className="grid gap-4 md:grid-cols-2">
       <div className="space-y-2"><Label htmlFor="nombres">Nombres *</Label><Input id="nombres" name="nombres" value={form.nombres} onChange={handleChange}/></div>
@@ -75,11 +95,12 @@ export function ProspectosContainer() {
       <div className="space-y-2"><Label htmlFor="email">Email</Label><Input id="email" name="email" type="email" value={form.email} onChange={handleChange}/></div>
       <div className="space-y-2"><Label htmlFor="ciudad">Ciudad</Label><Input id="ciudad" name="ciudad" value={form.ciudad} onChange={handleChange}/></div>
       <div className="space-y-2"><Label htmlFor="pais">País</Label><Input id="pais" name="pais" value={form.pais} onChange={handleChange}/></div>
-      <div className="space-y-2"><Label htmlFor="origen">Fuente / origen</Label><select id="origen" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.origen} onChange={e=>setForm(c=>({...c,origen:e.target.value}))}><option value="">Selecciona una fuente</option>{ORIGENES_PROSPECTO.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
+      <div className="space-y-2"><Label htmlFor="origen">Fuente / origen</Label><select id="origen" className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={form.origen} onChange={e=>{setForm(c=>({...c,origen:e.target.value}));setDuplicado(null);}}><option value="">Selecciona una fuente</option>{ORIGENES_PROSPECTO.map(o=><option key={o.value} value={o.value}>{o.label}</option>)}</select></div>
       <div className="space-y-2"><Label htmlFor="origenDetalle">Detalle de fuente</Label><Input id="origenDetalle" name="origenDetalle" placeholder="Ej. referido por Ana, campaña Agosto, anuncio Meta..." value={form.origenDetalle} onChange={handleChange}/></div>
       <div className="space-y-2"><Label htmlFor="interes">Interés</Label><Input id="interes" name="interes" placeholder="Visa turista, estudiante..." value={form.interes} onChange={handleChange}/></div>
       <div className="space-y-2 md:col-span-2"><Label htmlFor="observaciones">Observaciones</Label><Textarea id="observaciones" name="observaciones" value={form.observaciones} onChange={handleChange}/></div>
-      {error&&<p className="text-sm text-destructive md:col-span-2">{error}</p>}<div className="md:col-span-2"><Button type="submit" disabled={saving}>{saving?"Guardando...":"Guardar prospecto"}</Button></div>
+      {error&&<div className="space-y-2 md:col-span-2"><p className="text-sm text-destructive">{error}</p>{duplicado&&<div className="rounded-lg border p-3 text-sm"><p className="font-medium">Posible duplicado detectado: {duplicado.nombre}</p><p className="mt-1 text-muted-foreground">Coincidencia por {duplicado.coincidencia === "TELEFONO_EMAIL" ? "teléfono y email" : duplicado.coincidencia === "TELEFONO" ? "teléfono" : "email"}{duplicado.convertido ? ". Este registro ya fue convertido en cliente." : "."}</p><Button type="button" variant="outline" size="sm" className="mt-3" onClick={()=>router.push(`/prospectos/${duplicado.id}`)}>Abrir prospecto existente</Button></div>}</div>}
+      <div className="md:col-span-2"><Button type="submit" disabled={saving}>{saving?"Guardando...":"Guardar prospecto"}</Button></div>
     </form></CardContent></Card>}
 
     <Card><CardHeader className="gap-4"><div><CardTitle>Prospectos registrados</CardTitle><p className="mt-1 text-sm text-muted-foreground">Los prospectos activos se ordenan por Score NEXUS para facilitar el seguimiento comercial.</p></div><div className="flex flex-wrap gap-2">{[["TODOS","Todos"],["ALTA","Alta"],["MEDIA","Media"],["BAJA","Baja"],["SIN_EVALUAR","Sin evaluar"],["CONVERTIDO","Convertidos"]].map(([value,label])=><Button key={value} type="button" size="sm" variant={filtro===value?"default":"outline"} onClick={()=>setFiltro(value)}>{label}</Button>)}</div></CardHeader><CardContent>
