@@ -3,16 +3,17 @@ import { NextResponse } from "next/server";
 import { randomUUID } from "crypto";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { puedeAccederProspecto } from "@/lib/prospectos/permisos";
+import { registrarAuditoriaProspecto } from "@/lib/prospectos/auditoria";
 
-export async function POST(
-  request: Request,
-  { params }: { params: Promise<{ prospectoId: string }> },
-) {
+export async function POST(request: Request, { params }: { params: Promise<{ prospectoId: string }> }) {
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
 
     const { prospectoId } = await params;
+    if (!(await puedeAccederProspecto(session.user.id, prospectoId))) return NextResponse.json({ error: "Sin permiso para convertir este prospecto" }, { status: 403 });
+
     const body = await request.json();
     const regionId = typeof body.regionId === "string" ? body.regionId.trim() : "";
     if (!regionId) return NextResponse.json({ error: "La región es obligatoria para convertir el prospecto" }, { status: 400 });
@@ -27,27 +28,13 @@ export async function POST(
 
     const resultado = await db.$transaction(async (tx) => {
       const cliente = await tx.cliente.create({
-        data: {
-          nombres: prospecto.nombres,
-          apellidos: prospecto.apellidos ?? "",
-          email: prospecto.email,
-          telefonoCelular: prospecto.telefono,
-          nacionalidad: prospecto.pais,
-          regionId,
-          registradoPorId: session.user.id,
-        },
+        data: { nombres: prospecto.nombres, apellidos: prospecto.apellidos ?? "", email: prospecto.email, telefonoCelular: prospecto.telefono, nacionalidad: prospecto.pais, regionId, registradoPorId: session.user.id },
         select: { id: true, nombres: true, apellidos: true },
       });
 
       const prospectoActualizado = await tx.prospecto.update({
         where: { id: prospecto.id },
-        data: {
-          convertido: true,
-          estado: "CONVERTIDO",
-          clienteId: cliente.id,
-          convertidoPorId: session.user.id,
-          convertidoAt: new Date(),
-        },
+        data: { convertido: true, estado: "CONVERTIDO", clienteId: cliente.id, convertidoPorId: session.user.id, convertidoAt: new Date() },
         include: {
           creadoPor: { select: { id: true, name: true, email: true } },
           convertidoPor: { select: { id: true, name: true, email: true } },
@@ -55,19 +42,9 @@ export async function POST(
         },
       });
 
-      await tx.$executeRaw`
-        UPDATE "prospecto"
-        SET "primer_contacto_at" = COALESCE("primer_contacto_at", CURRENT_TIMESTAMP)
-        WHERE "id" = ${prospecto.id}
-      `;
-
-      const historialId = randomUUID();
-      await tx.$executeRaw`
-        INSERT INTO "prospecto_historial"
-          ("id", "prospecto_id", "estado_anterior", "estado_nuevo", "motivo_perdida", "cambiado_por_id", "created_at")
-        VALUES
-          (${historialId}, ${prospecto.id}, ${prospecto.estado}, 'CONVERTIDO', NULL, ${session.user.id}, CURRENT_TIMESTAMP)
-      `;
+      await tx.$executeRaw`UPDATE "prospecto" SET "primer_contacto_at" = COALESCE("primer_contacto_at", CURRENT_TIMESTAMP) WHERE "id" = ${prospecto.id}`;
+      await tx.$executeRaw`INSERT INTO "prospecto_historial" ("id", "prospecto_id", "estado_anterior", "estado_nuevo", "motivo_perdida", "cambiado_por_id", "created_at") VALUES (${randomUUID()}, ${prospecto.id}, ${prospecto.estado}, 'CONVERTIDO', NULL, ${session.user.id}, CURRENT_TIMESTAMP)`;
+      await registrarAuditoriaProspecto(tx, { prospectoId: prospecto.id, usuarioId: session.user.id, accion: "CONVERSION", detalle: { estadoAnterior: prospecto.estado, clienteId: cliente.id, regionId } });
 
       return { cliente, prospecto: prospectoActualizado };
     });
