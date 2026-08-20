@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { esOrigenProspecto } from "@/lib/prospectos/origenes";
+import { detectarProspectoDuplicado } from "@/lib/prospectos/deduplicacion";
 
 export async function GET() {
   try {
@@ -40,6 +41,35 @@ export async function POST(request: Request) {
     }
     if (origen && !esOrigenProspecto(origen)) {
       return NextResponse.json({ error: "Origen del prospecto no válido" }, { status: 400 });
+    }
+
+    const identidades = await db.prospecto.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        nombres: true,
+        apellidos: true,
+        telefono: true,
+        email: true,
+        convertido: true,
+      },
+    });
+    const duplicado = detectarProspectoDuplicado(identidades, telefono, email);
+    if (duplicado) {
+      const nombre = `${duplicado.prospecto.nombres} ${duplicado.prospecto.apellidos ?? ""}`.trim();
+      return NextResponse.json(
+        {
+          error: `Ya existe un prospecto con ${duplicado.coincidencia === "EMAIL" ? "ese email" : duplicado.coincidencia === "TELEFONO" ? "ese teléfono" : "ese teléfono y email"}: ${nombre}.`,
+          code: "PROSPECTO_DUPLICADO",
+          duplicado: {
+            id: duplicado.prospecto.id,
+            nombre,
+            coincidencia: duplicado.coincidencia,
+            convertido: Boolean(duplicado.prospecto.convertido),
+          },
+        },
+        { status: 409 },
+      );
     }
 
     const prospecto = await db.$transaction(async (tx) => {
