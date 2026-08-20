@@ -8,11 +8,17 @@ export async function ensureHospedajeSchema() {
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "distribucionHabitaciones" JSONB`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_hospedaje" DROP CONSTRAINT IF EXISTS "orden_cotizacion_hospedaje_estado_check"`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_hospedaje" ADD CONSTRAINT "orden_cotizacion_hospedaje_estado_check" CHECK ("estado" IN ('PENDIENTE','DESPACHADA','EMITIDA'))`);
-  await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "montoVenta" NUMERIC(12,2)`);
-  await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "monedaVenta" TEXT`);
-  await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "metodoPago" TEXT`);
-  await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "fechaEmision" TIMESTAMP(3)`);
-  await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "observacionPago" TEXT`);
+  for (const sql of [
+    `ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "montoVenta" NUMERIC(12,2)`,
+    `ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "monedaVenta" TEXT`,
+    `ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "metodoPago" TEXT`,
+    `ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "fechaEmision" TIMESTAMP(3)`,
+    `ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "observacionPago" TEXT`,
+    `ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "cerradoPorId" TEXT`,
+    `ALTER TABLE "orden_cotizacion_hospedaje" ADD COLUMN IF NOT EXISTS "comisionVenta" NUMERIC(12,2) DEFAULT 0`
+  ]) await db.$executeRawUnsafe(sql);
+  await db.$executeRawUnsafe(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='orden_cotizacion_hospedaje_cerradoPorId_fkey') THEN ALTER TABLE "orden_cotizacion_hospedaje" ADD CONSTRAINT "orden_cotizacion_hospedaje_cerradoPorId_fkey" FOREIGN KEY ("cerradoPorId") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;`);
   await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_hospedaje_estado_idx" ON "orden_cotizacion_hospedaje"("estado")`);
+  await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_hospedaje_cerradoPorId_idx" ON "orden_cotizacion_hospedaje"("cerradoPorId")`);
   await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_hospedaje_createdAt_idx" ON "orden_cotizacion_hospedaje"("createdAt")`);
 }
