@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { DashboardBienvenida } from "@/components/system/dashboard/dashboard-bienvenida";
 import { DashboardContainer } from "@/components/system/dashboard/dashboard-container";
+import { EntrevistasHoyCard } from "@/components/system/dashboard/entrevistas-hoy-card";
 import { auth } from "@/lib/auth";
 
 const ROLES_GERENCIALES = ["MANAGER", "ADMIN", "SUPER_ADMIN"] as const;
@@ -26,8 +27,22 @@ export default async function DashboardPage() {
   const rol = session.user.role ?? "USER";
 
   if (esRolGerencial(rol)) {
-    return <DashboardContainer nombreUsuario={session.user.name} rol={rol} />;
+    return (
+      <div className="flex-1">
+        <div className="px-8 pt-6">
+          <EntrevistasHoyCard />
+        </div>
+        <DashboardContainer nombreUsuario={session.user.name} rol={rol} />
+      </div>
+    );
   }
 
-  return <DashboardBienvenida nombre={session.user.name} rol={rol} />;
+  return (
+    <div className="flex-1">
+      <div className="px-8 pt-6">
+        <EntrevistasHoyCard />
+      </div>
+      <DashboardBienvenida nombre={session.user.name} rol={rol} />
+    </div>
+  );
 }
