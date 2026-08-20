@@ -45,7 +45,7 @@ export async function DashboardProspectosEquipo() {
         COUNT(DISTINCT s."id") FILTER (WHERE s."estado"='COMPLETADO') AS "completados"
       FROM "user" u
       LEFT JOIN "prospecto" p
-        ON p."creadoPorId"=u."id" AND p."deletedAt" IS NULL
+        ON COALESCE(p."responsable_comercial_id", p."creadoPorId")=u."id" AND p."deletedAt" IS NULL
       LEFT JOIN "prospecto_seguimiento" s
         ON s."responsable_id"=u."id"
       WHERE u."status"='ACTIVE'
@@ -108,7 +108,7 @@ export async function DashboardProspectosEquipo() {
         <CardHeader>
           <CardTitle className="text-base">Productividad comercial del equipo</CardTitle>
           <p className="text-sm text-muted-foreground">
-            La cartera se atribuye al creador del prospecto y los seguimientos al responsable asignado.
+            La cartera se atribuye al Responsable Comercial formal; los seguimientos, al usuario asignado a cada acción.
           </p>
         </CardHeader>
         <CardContent>
@@ -137,12 +137,7 @@ export async function DashboardProspectosEquipo() {
                     const itemVencidos = numero(item.vencidos);
                     return (
                       <tr key={item.id} className="border-b last:border-0">
-                        <td className="py-3 font-medium">
-                          <span className="inline-flex items-center gap-2">
-                            <UserRoundCheck className="h-4 w-4 text-muted-foreground" />
-                            {item.nombre}
-                          </span>
-                        </td>
+                        <td className="py-3 font-medium"><span className="inline-flex items-center gap-2"><UserRoundCheck className="h-4 w-4 text-muted-foreground" />{item.nombre}</span></td>
                         <td className="py-3 text-right">{cartera}</td>
                         <td className="py-3 text-right">{numero(item.activos)}</td>
                         <td className="py-3 text-right">{numero(item.altaPrioridad)}</td>
