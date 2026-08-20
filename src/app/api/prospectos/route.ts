@@ -4,11 +4,28 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { esOrigenProspecto } from "@/lib/prospectos/origenes";
 import { detectarProspectoDuplicado } from "@/lib/prospectos/deduplicacion";
+import { alcanceProspectos, idsProspectosAsignados } from "@/lib/prospectos/permisos";
+import { registrarAuditoriaProspecto } from "@/lib/prospectos/auditoria";
 
 export async function GET() {
   try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user?.id) return NextResponse.json({ error: "No autorizado" }, { status: 401 });
+
+    const alcance = await alcanceProspectos(session.user.id);
+    const asignados = alcance.accesoTotal ? [] : await idsProspectosAsignados(session.user.id);
+    const where = alcance.accesoTotal
+      ? { deletedAt: null }
+      : {
+          deletedAt: null,
+          OR: [
+            { creadoPorId: { in: alcance.userIds } },
+            ...(asignados.length ? [{ id: { in: asignados } }] : []),
+          ],
+        };
+
     const prospectos = await db.prospecto.findMany({
-      where: { deletedAt: null },
+      where,
       orderBy: { createdAt: "desc" },
       include: {
         creadoPor: { select: { id: true, name: true, email: true } },
@@ -36,49 +53,27 @@ export async function POST(request: Request) {
     const origen = typeof body.origen === "string" ? body.origen.trim().toUpperCase() : "";
     const origenDetalle = typeof body.origenDetalle === "string" ? body.origenDetalle.trim() || null : null;
 
-    if (!nombres || !telefono) {
-      return NextResponse.json({ error: "Nombre y teléfono son obligatorios" }, { status: 400 });
-    }
-    if (origen && !esOrigenProspecto(origen)) {
-      return NextResponse.json({ error: "Origen del prospecto no válido" }, { status: 400 });
-    }
+    if (!nombres || !telefono) return NextResponse.json({ error: "Nombre y teléfono son obligatorios" }, { status: 400 });
+    if (origen && !esOrigenProspecto(origen)) return NextResponse.json({ error: "Origen del prospecto no válido" }, { status: 400 });
 
     const identidades = await db.prospecto.findMany({
       where: { deletedAt: null },
-      select: {
-        id: true,
-        nombres: true,
-        apellidos: true,
-        telefono: true,
-        email: true,
-        convertido: true,
-      },
+      select: { id: true, nombres: true, apellidos: true, telefono: true, email: true, convertido: true },
     });
     const duplicado = detectarProspectoDuplicado(identidades, telefono, email);
     if (duplicado) {
       const nombre = `${duplicado.prospecto.nombres} ${duplicado.prospecto.apellidos ?? ""}`.trim();
-      return NextResponse.json(
-        {
-          error: `Ya existe un prospecto con ${duplicado.coincidencia === "EMAIL" ? "ese email" : duplicado.coincidencia === "TELEFONO" ? "ese teléfono" : "ese teléfono y email"}: ${nombre}.`,
-          code: "PROSPECTO_DUPLICADO",
-          duplicado: {
-            id: duplicado.prospecto.id,
-            nombre,
-            coincidencia: duplicado.coincidencia,
-            convertido: Boolean(duplicado.prospecto.convertido),
-          },
-        },
-        { status: 409 },
-      );
+      return NextResponse.json({
+        error: `Ya existe un prospecto con ${duplicado.coincidencia === "EMAIL" ? "ese email" : duplicado.coincidencia === "TELEFONO" ? "ese teléfono" : "ese teléfono y email"}: ${nombre}.`,
+        code: "PROSPECTO_DUPLICADO",
+        duplicado: { id: duplicado.prospecto.id, nombre, coincidencia: duplicado.coincidencia, convertido: Boolean(duplicado.prospecto.convertido) },
+      }, { status: 409 });
     }
 
     const prospecto = await db.$transaction(async (tx) => {
       const creado = await tx.prospecto.create({
         data: {
-          nombres,
-          apellidos,
-          telefono,
-          email,
+          nombres, apellidos, telefono, email,
           ciudad: typeof body.ciudad === "string" ? body.ciudad.trim() || null : null,
           pais: typeof body.pais === "string" ? body.pais.trim() || "Bolivia" : "Bolivia",
           origen: origen || null,
@@ -90,11 +85,13 @@ export async function POST(request: Request) {
         include: { creadoPor: { select: { id: true, name: true, email: true } } },
       });
 
-      await tx.$executeRaw`
-        UPDATE "prospecto"
-        SET "origen_detalle" = ${origenDetalle}
-        WHERE "id" = ${creado.id}
-      `;
+      await tx.$executeRaw`UPDATE "prospecto" SET "origen_detalle" = ${origenDetalle} WHERE "id" = ${creado.id}`;
+      await registrarAuditoriaProspecto(tx, {
+        prospectoId: creado.id,
+        usuarioId: session.user.id,
+        accion: "CREACION",
+        detalle: { origen: origen || null, estado: "NUEVO" },
+      });
       return creado;
     });
 
