@@ -11,7 +11,6 @@ type ResponsableActualRow = {
   prospectoId: string;
   responsableId: string | null;
   responsableNombre: string | null;
-  programadoAt: Date;
 };
 
 export async function GET() {
@@ -51,15 +50,10 @@ export async function GET() {
         select: { id: true, name: true, email: true },
       }),
       db.$queryRaw<ResponsableActualRow[]>`
-        SELECT DISTINCT ON (s."prospecto_id")
-          s."prospecto_id" AS "prospectoId",
-          s."responsable_id" AS "responsableId",
-          u."name" AS "responsableNombre",
-          s."programado_at" AS "programadoAt"
-        FROM "prospecto_seguimiento" s
-        LEFT JOIN "user" u ON u."id" = s."responsable_id"
-        WHERE s."estado" = 'PENDIENTE'
-        ORDER BY s."prospecto_id", s."programado_at" ASC
+        SELECT p."id" AS "prospectoId", p."responsable_comercial_id" AS "responsableId", u."name" AS "responsableNombre"
+        FROM "prospecto" p
+        LEFT JOIN "user" u ON u."id"=p."responsable_comercial_id"
+        WHERE p."deletedAt" IS NULL
       `,
     ]);
 
@@ -69,11 +63,7 @@ export async function GET() {
         .filter((item) => idsVisibles.has(item.prospectoId))
         .map((item) => [
           item.prospectoId,
-          {
-            id: item.responsableId,
-            name: item.responsableNombre,
-            programadoAt: item.programadoAt,
-          },
+          { id: item.responsableId, name: item.responsableNombre },
         ]),
     );
 
