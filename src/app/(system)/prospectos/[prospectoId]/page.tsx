@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { ProspectoAuditoria } from "@/components/system/prospectos/prospecto-auditoria";
 import { ProspectoDetalle } from "@/components/system/prospectos/prospecto-detalle";
 import { ProspectoHistorial } from "@/components/system/prospectos/prospecto-historial";
+import { ProspectoResponsableComercial } from "@/components/system/prospectos/prospecto-responsable-comercial";
 import { ProspectoSeguimiento } from "@/components/system/prospectos/prospecto-seguimiento";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
@@ -31,6 +32,7 @@ export default async function ProspectoPage({ params }: { params: Promise<{ pros
       </div>
 
       <div className="space-y-6 px-8 pt-6">
+        <ProspectoResponsableComercial prospectoId={prospectoId} convertido={prospecto.convertido} />
         <ProspectoSeguimiento prospectoId={prospectoId} convertido={prospecto.convertido} />
         <ProspectoHistorial prospectoId={prospectoId} />
         <ProspectoAuditoria prospectoId={prospectoId} />
