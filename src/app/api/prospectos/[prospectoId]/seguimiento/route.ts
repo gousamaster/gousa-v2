@@ -114,6 +114,13 @@ export async function POST(
       );
     }
 
+    if (programadoAt.getTime() <= Date.now()) {
+      return NextResponse.json(
+        { error: "La fecha y hora del seguimiento deben ser posteriores al momento actual" },
+        { status: 400 },
+      );
+    }
+
     const [prospecto, responsable] = await Promise.all([
       db.prospecto.findFirst({
         where: { id: prospectoId, deletedAt: null, convertido: false },
