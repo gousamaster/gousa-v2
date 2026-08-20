@@ -1,59 +1,29 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
-import { AlertTriangle, CalendarClock, CheckCircle2, Clock3, RefreshCcw, XCircle } from "lucide-react";
+import { useCallback,useEffect,useState } from "react";
+import { AlertTriangle,CalendarClock,CheckCircle2,Clock3,RefreshCcw,XCircle } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card,CardContent,CardHeader,CardTitle } from "@/components/ui/card";
+import { Checkbox } from "@/components/ui/checkbox";
 
- type Entrevista = {
-  id:string; fechaHora:string; lugar:string|null; tipoCita:string; cliente:string|null; grupoFamiliar:string|null;
-  participantes:number; resultado:string|null; registradoAt:string|null; horasDesdeCita:number; estadoResultado:string;
+type Entrevista={
+  id:string;fechaHora:string;lugar:string|null;tipoCita:string;cliente:string|null;grupoFamiliar:string|null;
+  participantes:number;resultado:string|null;registradoAt:string|null;horasDesdeCita:number;estadoResultado:string;diaOffset:number;recordatorioEnviado:boolean;
 };
+const LABELS:Record<string,string>={APROBADA:"Aprobada",NEGADA:"Negada",REPROGRAMADA:"Reprogramada",PENDIENTE:"Resultado pendiente",ATRASADO:"Resultado atrasado",PROXIMA:"Próxima"};
 
-const LABELS: Record<string,string> = { APROBADA:"Aprobada", NEGADA:"Negada", REPROGRAMADA:"Reprogramada", PENDIENTE:"Resultado pendiente", ATRASADO:"Resultado atrasado", PROXIMA:"Próxima" };
+async function leerJsonSeguro(r:Response){const text=await r.text();if(!text)return {} as {error?:string;entrevistas?:Entrevista[]};try{return JSON.parse(text) as {error?:string;entrevistas?:Entrevista[]}}catch{return {error:r.ok?"Respuesta inesperada del servidor":"El servidor no pudo procesar la solicitud"}}}
 
 export function EntrevistasHoyCard(){
-  const [entrevistas,setEntrevistas]=useState<Entrevista[]>([]);
-  const [loading,setLoading]=useState(true);
-  const [saving,setSaving]=useState<string|null>(null);
-  const [error,setError]=useState<string|null>(null);
+ const[entrevistas,setEntrevistas]=useState<Entrevista[]>([]),[loading,setLoading]=useState(true),[saving,setSaving]=useState<string|null>(null),[error,setError]=useState<string|null>(null);
+ const cargar=useCallback(async()=>{setLoading(true);try{const r=await fetch("/api/nexus/entrevistas-hoy",{cache:"no-store"});const j=await leerJsonSeguro(r);if(!r.ok)throw new Error(j.error??"No se pudieron cargar las entrevistas");setEntrevistas(j.entrevistas??[]);setError(null)}catch(e){setError(e instanceof Error?e.message:"No se pudieron cargar las entrevistas")}finally{setLoading(false)}},[]);
+ useEffect(()=>{void cargar()},[cargar]);
+ async function registrar(id:string,resultado:"APROBADA"|"NEGADA"|"REPROGRAMADA"){setSaving(id);setError(null);try{const r=await fetch(`/api/nexus/citas/${id}/resultado-consular`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({resultado})});const j=await leerJsonSeguro(r);if(!r.ok)throw new Error(j.error??"No se pudo guardar el resultado");await cargar()}catch(e){setError(e instanceof Error?e.message:"No se pudo guardar el resultado")}finally{setSaving(null)}}
+ async function marcarRecordatorio(id:string,enviado:boolean){setSaving(id);setError(null);try{const r=await fetch(`/api/nexus/citas/${id}/recordatorio-entrevista`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({enviado})});const j=await leerJsonSeguro(r);if(!r.ok)throw new Error(j.error??"No se pudo actualizar el recordatorio");setEntrevistas(actuales=>actuales.map(e=>e.id===id?{...e,recordatorioEnviado:enviado}:e))}catch(e){setError(e instanceof Error?e.message:"No se pudo actualizar el recordatorio")}finally{setSaving(null)}}
 
-  const cargar=useCallback(async()=>{
-    setLoading(true);setError(null);
-    try{const r=await fetch("/api/nexus/entrevistas-hoy",{cache:"no-store"});const j=await r.json();if(!r.ok)throw new Error(j.error??"No se pudieron cargar las entrevistas");setEntrevistas(j.entrevistas??[])}
-    catch(e){setError(e instanceof Error?e.message:"No se pudieron cargar las entrevistas")}
-    finally{setLoading(false)}
-  },[]);
-  useEffect(()=>{void cargar()},[cargar]);
+ const etiquetas=["Hoy","Mañana","Pasado mañana"];
+ const renderGrupo=(offset:number)=>{const items=entrevistas.filter(e=>e.diaOffset===offset);return <div className="space-y-2"><div className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{etiquetas[offset]}</div>{items.length===0?<div className="rounded-lg border border-dashed p-3 text-center text-sm text-muted-foreground">Sin entrevistas.</div>:items.map(e=>{const hora=new Date(e.fechaHora).toLocaleTimeString("es-BO",{timeZone:"America/La_Paz",hour:"2-digit",minute:"2-digit",hour12:false});const nombre=e.grupoFamiliar??e.cliente??"Sin cliente";const atrasado=e.estadoResultado==="ATRASADO";const pendiente=offset===0&&(e.estadoResultado==="PENDIENTE"||atrasado);return <div key={e.id} className={`rounded-lg border p-3 ${atrasado?"border-red-300 bg-red-50/60":""}`}><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{hora}</span><span className="truncate font-medium">{nombre}</span>{e.grupoFamiliar&&<Badge variant="secondary">Grupo · {Math.max(e.participantes,1)} solicitantes</Badge>}<Badge variant={atrasado?"destructive":"outline"}>{LABELS[e.estadoResultado]??e.estadoResultado}</Badge>{e.recordatorioEnviado&&<Badge className="bg-emerald-600">Recordatorio enviado</Badge>}</div><div className="mt-1 text-xs text-muted-foreground">{e.lugar??"Embajada Americana"}</div></div><div className="flex flex-wrap gap-2">{pendiente&&<><Button size="sm" onClick={()=>void registrar(e.id,"APROBADA")} disabled={saving===e.id}><CheckCircle2 className="mr-1.5 h-4 w-4"/>Aprobada</Button><Button size="sm" variant="destructive" onClick={()=>void registrar(e.id,"NEGADA")} disabled={saving===e.id}><XCircle className="mr-1.5 h-4 w-4"/>Negada</Button><Button size="sm" variant="outline" onClick={()=>void registrar(e.id,"REPROGRAMADA")} disabled={saving===e.id}><Clock3 className="mr-1.5 h-4 w-4"/>Reprogramada</Button></>}{e.resultado&&<span className="inline-flex items-center gap-1 text-sm font-medium"><CheckCircle2 className="h-4 w-4"/>{LABELS[e.resultado]??e.resultado}</span>}{atrasado&&<AlertTriangle className="h-5 w-5 text-red-600"/>}</div></div>{offset===1&&<label className="mt-3 flex cursor-pointer items-center gap-2 border-t pt-3 text-sm"><Checkbox checked={e.recordatorioEnviado} disabled={saving===e.id} onCheckedChange={v=>void marcarRecordatorio(e.id,v===true)}/><span>Enviar recordatorio de entrevista a cliente</span></label>}</div>})}</div>};
 
-  async function registrar(id:string,resultado:"APROBADA"|"NEGADA"|"REPROGRAMADA"){
-    setSaving(id);setError(null);
-    try{const r=await fetch(`/api/nexus/citas/${id}/resultado-consular`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({resultado})});const j=await r.json();if(!r.ok)throw new Error(j.error??"No se pudo guardar el resultado");await cargar()}
-    catch(e){setError(e instanceof Error?e.message:"No se pudo guardar el resultado")}
-    finally{setSaving(null)}
-  }
-
-  return <Card className="border-blue-200 shadow-sm">
-    <CardHeader className="pb-3">
-      <div className="flex items-center justify-between gap-3">
-        <div><CardTitle className="flex items-center gap-2 text-base"><CalendarClock className="h-5 w-5"/>Entrevistas en Embajada · Hoy</CardTitle><p className="mt-1 text-xs text-muted-foreground">Registra el resultado máximo 6 horas después de cada entrevista.</p></div>
-        <Button variant="outline" size="sm" onClick={()=>void cargar()} disabled={loading}><RefreshCcw className="mr-2 h-4 w-4"/>Actualizar</Button>
-      </div>
-    </CardHeader>
-    <CardContent className="space-y-3">
-      {error&&<div className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div>}
-      {loading?<p className="text-sm text-muted-foreground">Cargando entrevistas...</p>:entrevistas.length===0?<div className="rounded-lg border border-dashed p-5 text-center text-sm text-muted-foreground">No hay entrevistas consulares registradas para hoy.</div>:entrevistas.map(e=>{
-        const hora=new Date(e.fechaHora).toLocaleTimeString("es-BO",{hour:"2-digit",minute:"2-digit"});
-        const nombre=e.grupoFamiliar??e.cliente??"Sin cliente";
-        const atrasado=e.estadoResultado==="ATRASADO";
-        const pendiente=e.estadoResultado==="PENDIENTE"||atrasado;
-        return <div key={e.id} className={`rounded-lg border p-3 ${atrasado?"border-red-300 bg-red-50/60":""}`}>
-          <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-            <div className="min-w-0"><div className="flex flex-wrap items-center gap-2"><span className="font-semibold">{hora}</span><span className="truncate font-medium">{nombre}</span>{e.grupoFamiliar&&<Badge variant="secondary">Grupo · {Math.max(e.participantes,1)} solicitantes</Badge>}<Badge variant={atrasado?"destructive":"outline"}>{LABELS[e.estadoResultado]??e.estadoResultado}</Badge></div><div className="mt-1 text-xs text-muted-foreground">{e.lugar??"Embajada Americana"}</div></div>
-            <div className="flex flex-wrap gap-2">{pendiente&&<><Button size="sm" onClick={()=>void registrar(e.id,"APROBADA")} disabled={saving===e.id}><CheckCircle2 className="mr-1.5 h-4 w-4"/>Aprobada</Button><Button size="sm" variant="destructive" onClick={()=>void registrar(e.id,"NEGADA")} disabled={saving===e.id}><XCircle className="mr-1.5 h-4 w-4"/>Negada</Button><Button size="sm" variant="outline" onClick={()=>void registrar(e.id,"REPROGRAMADA")} disabled={saving===e.id}><Clock3 className="mr-1.5 h-4 w-4"/>Reprogramada</Button></>}{e.resultado&&<span className="inline-flex items-center gap-1 text-sm font-medium"><CheckCircle2 className="h-4 w-4"/>{LABELS[e.resultado]??e.resultado}</span>}{atrasado&&<AlertTriangle className="h-5 w-5 text-red-600"/>}</div>
-          </div>
-        </div>})}
-    </CardContent>
-  </Card>;
+ return <Card className="border-blue-200 shadow-sm"><CardHeader className="pb-3"><div className="flex items-center justify-between gap-3"><div><CardTitle className="flex items-center gap-2 text-base"><CalendarClock className="h-5 w-5"/>Entrevistas en Embajada · Próximos 3 días</CardTitle><p className="mt-1 text-xs text-muted-foreground">Hoy controla resultados; mañana recuerda confirmar el envío del recordatorio.</p></div><Button variant="outline" size="sm" onClick={()=>void cargar()} disabled={loading}><RefreshCcw className="mr-2 h-4 w-4"/>Actualizar</Button></div></CardHeader><CardContent className="space-y-5">{error&&<div className="rounded-md border border-red-200 bg-red-50 p-2 text-sm text-red-700">{error}</div>}{loading&&entrevistas.length===0?<p className="text-sm text-muted-foreground">Cargando entrevistas...</p>:<>{renderGrupo(0)}{renderGrupo(1)}{renderGrupo(2)}</>}</CardContent></Card>;
 }
