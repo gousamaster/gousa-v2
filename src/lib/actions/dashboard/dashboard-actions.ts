@@ -145,7 +145,7 @@ export async function obtenerKpisGenerales(filtro: FiltroFecha): Promise<ActionR
       db.cliente.groupBy({by:["regionId"],where:{deletedAt:null},_count:true,orderBy:{_count:{regionId:"desc"}},take:6}),
       db.cliente.groupBy({by:["tipoCliente"],where:{deletedAt:null},_count:true}),
     ]);
-    const regionIds=clientesPorRegion.map(r=>r.regionId);const regiones=await db.catalogoRegion.findMany({where:{id:{in:regionIds}},select:{id:true,nombre:true}});const regionMap=new Map(regiones.map(r=>[r.id,r.nombre]));const ingresosServiciosNum=Number(ingresosServicios._sum.precioFinal??0),ingresosCitasNum=Number(ingresosCitas._sum.precioFinal??0);
+    const regionIds=clientesPorRegion.map(r=>r.regionId);const regiones=await db.region.findMany({where:{id:{in:regionIds}},select:{id:true,nombre:true}});const regionMap=new Map(regiones.map(r=>[r.id,r.nombre]));const ingresosServiciosNum=Number(ingresosServicios._sum.precioFinal??0),ingresosCitasNum=Number(ingresosCitas._sum.precioFinal??0);
     return {success:true,data:{totalClientes,clientesNuevos,totalTramites,tramitesActivos,tramitesCompletados,totalCitas,citasProgramadas,citasCompletadas,gruposFamiliares,ingresosTotales:ingresosServiciosNum+ingresosCitasNum,ingresosServicios:ingresosServiciosNum,ingresosCitas:ingresosCitasNum,tasaAsistencia:totalParticipantes>0?Math.round((asistenciaCitas/totalParticipantes)*100):0,clientesPorRegion:clientesPorRegion.map(r=>({region:regionMap.get(r.regionId)??r.regionId,total:r._count})),clientesPorTipo:clientesPorTipo.map(t=>({tipo:t.tipoCliente==="ADULTO"?"Adulto":"Infante",total:t._count}))}};
   } catch (error) {console.error("Error al obtener KPIs:",error);return {success:false,error:"Error al obtener indicadores"};}
 }
