@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { randomUUID } from "crypto";
 
 const ESTADOS = ["NUEVO", "CONTACTADO", "CALIFICADO", "SEGUIMIENTO", "PERDIDO"] as const;
 
@@ -61,41 +62,58 @@ export async function PATCH(
       return NextResponse.json({ error: "El motivo de pérdida es obligatorio" }, { status: 400 });
     }
 
-    const prospecto = await db.prospecto.update({
-      where: { id: prospectoId },
-      data: {
-        nombres: typeof body.nombres === "string" ? body.nombres.trim() : undefined,
-        apellidos: typeof body.apellidos === "string" ? body.apellidos.trim() || null : undefined,
-        telefono: typeof body.telefono === "string" ? body.telefono.trim() : undefined,
-        email: typeof body.email === "string" ? body.email.trim() || null : undefined,
-        ciudad: typeof body.ciudad === "string" ? body.ciudad.trim() || null : undefined,
-        pais: typeof body.pais === "string" ? body.pais.trim() || null : undefined,
-        origen: typeof body.origen === "string" ? body.origen.trim() || null : undefined,
-        interes: typeof body.interes === "string" ? body.interes.trim() || null : undefined,
-        observaciones: typeof body.observaciones === "string" ? body.observaciones.trim() || null : undefined,
-        estado,
-        scorePreliminar: typeof body.scorePreliminar === "number"
-          ? Math.max(0, Math.min(100, body.scorePreliminar))
-          : body.scorePreliminar === null ? null : undefined,
-      },
-      include: {
-        creadoPor: { select: { id: true, name: true, email: true } },
-        convertidoPor: { select: { id: true, name: true, email: true } },
-        cliente: { select: { id: true, nombres: true, apellidos: true } },
-      },
-    });
+    const cambioEstado = estado !== prospectoActual.estado;
 
-    if (estado === "PERDIDO") {
-      await db.$executeRaw`
-        UPDATE "prospecto" SET "motivo_perdida" = ${motivoPerdida}, "perdido_at" = CURRENT_TIMESTAMP
-        WHERE "id" = ${prospectoId}
-      `;
-    } else {
-      await db.$executeRaw`
-        UPDATE "prospecto" SET "motivo_perdida" = NULL, "perdido_at" = NULL
-        WHERE "id" = ${prospectoId}
-      `;
-    }
+    const prospecto = await db.$transaction(async (tx) => {
+      const actualizado = await tx.prospecto.update({
+        where: { id: prospectoId },
+        data: {
+          nombres: typeof body.nombres === "string" ? body.nombres.trim() : undefined,
+          apellidos: typeof body.apellidos === "string" ? body.apellidos.trim() || null : undefined,
+          telefono: typeof body.telefono === "string" ? body.telefono.trim() : undefined,
+          email: typeof body.email === "string" ? body.email.trim() || null : undefined,
+          ciudad: typeof body.ciudad === "string" ? body.ciudad.trim() || null : undefined,
+          pais: typeof body.pais === "string" ? body.pais.trim() || null : undefined,
+          origen: typeof body.origen === "string" ? body.origen.trim() || null : undefined,
+          interes: typeof body.interes === "string" ? body.interes.trim() || null : undefined,
+          observaciones: typeof body.observaciones === "string" ? body.observaciones.trim() || null : undefined,
+          estado,
+          scorePreliminar: typeof body.scorePreliminar === "number"
+            ? Math.max(0, Math.min(100, body.scorePreliminar))
+            : body.scorePreliminar === null ? null : undefined,
+        },
+        include: {
+          creadoPor: { select: { id: true, name: true, email: true } },
+          convertidoPor: { select: { id: true, name: true, email: true } },
+          cliente: { select: { id: true, nombres: true, apellidos: true } },
+        },
+      });
+
+      if (estado === "PERDIDO") {
+        await tx.$executeRaw`
+          UPDATE "prospecto" SET "motivo_perdida" = ${motivoPerdida}, "perdido_at" = CURRENT_TIMESTAMP
+          WHERE "id" = ${prospectoId}
+        `;
+      } else {
+        await tx.$executeRaw`
+          UPDATE "prospecto" SET "motivo_perdida" = NULL, "perdido_at" = NULL
+          WHERE "id" = ${prospectoId}
+        `;
+      }
+
+      if (cambioEstado) {
+        const historialId = randomUUID();
+        const motivoHistorial = estado === "PERDIDO" ? motivoPerdida : null;
+        await tx.$executeRaw`
+          INSERT INTO "prospecto_historial"
+            ("id", "prospecto_id", "estado_anterior", "estado_nuevo", "motivo_perdida", "cambiado_por_id", "created_at")
+          VALUES
+            (${historialId}, ${prospectoId}, ${prospectoActual.estado}, ${estado}, ${motivoHistorial}, ${session.user.id}, CURRENT_TIMESTAMP)
+        `;
+      }
+
+      return actualizado;
+    });
 
     const perdida = await datosPerdida(prospectoId);
     return NextResponse.json({ prospecto: { ...prospecto, ...perdida } });
