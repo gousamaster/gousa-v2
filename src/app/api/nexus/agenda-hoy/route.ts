@@ -27,7 +27,7 @@ export async function GET() {
       LEFT JOIN "simulacro_instruccion" si ON si."citaId" = c."id"
       WHERE c."deletedAt" IS NULL
         AND c."estado" <> 'CANCELADA'
-        AND (c."fechaHora" AT TIME ZONE 'America/La_Paz')::date = (NOW() AT TIME ZONE 'America/La_Paz')::date
+        AND (c."fechaHora" - INTERVAL '4 hours')::date = (NOW() AT TIME ZONE 'America/La_Paz')::date
         AND (
           LOWER(tc."nombre") LIKE '%simulacr%' OR LOWER(COALESCE(tc."codigo",'')) LIKE '%simulacr%'
           OR LOWER(tc."nombre") LIKE '%asesor%' OR LOWER(COALESCE(tc."codigo",'')) LIKE '%asesor%'
