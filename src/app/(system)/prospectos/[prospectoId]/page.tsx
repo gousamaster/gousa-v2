@@ -1,6 +1,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { ProspectoDetalle } from "@/components/system/prospectos/prospecto-detalle";
+import { ProspectoHistorial } from "@/components/system/prospectos/prospecto-historial";
 import { ProspectoSeguimiento } from "@/components/system/prospectos/prospecto-seguimiento";
 import { Button } from "@/components/ui/button";
 import { auth } from "@/lib/auth";
@@ -34,11 +35,12 @@ export default async function ProspectoPage({
       </div>
 
       {prospecto && (
-        <div className="px-8 pt-6">
+        <div className="space-y-6 px-8 pt-6">
           <ProspectoSeguimiento
             prospectoId={prospectoId}
             convertido={prospecto.convertido}
           />
+          <ProspectoHistorial prospectoId={prospectoId} />
         </div>
       )}
 
