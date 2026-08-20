@@ -24,9 +24,16 @@ export async function alcanceProspectos(userId: string) {
 
 export async function idsProspectosAsignados(userId: string) {
   const rows = await db.$queryRaw<{ prospectoId: string }[]>`
-    SELECT DISTINCT "prospecto_id" AS "prospectoId"
-    FROM "prospecto_seguimiento"
-    WHERE "responsable_id" = ${userId}
+    SELECT DISTINCT "prospectoId"
+    FROM (
+      SELECT p."id" AS "prospectoId"
+      FROM "prospecto" p
+      WHERE p."deletedAt" IS NULL AND p."responsable_comercial_id"=${userId}
+      UNION
+      SELECT s."prospecto_id" AS "prospectoId"
+      FROM "prospecto_seguimiento" s
+      WHERE s."responsable_id"=${userId}
+    ) asignados
   `;
   return rows.map((row) => row.prospectoId);
 }
@@ -47,9 +54,16 @@ export async function puedeAccederProspecto(userId: string, prospectoId: string)
 
   const asignado = await db.$queryRaw<{ total: bigint }[]>`
     SELECT COUNT(*) AS "total"
-    FROM "prospecto_seguimiento"
-    WHERE "prospecto_id" = ${prospectoId}
-      AND "responsable_id" = ${userId}
+    FROM "prospecto" p
+    WHERE p."id"=${prospectoId}
+      AND p."deletedAt" IS NULL
+      AND (
+        p."responsable_comercial_id"=${userId}
+        OR EXISTS (
+          SELECT 1 FROM "prospecto_seguimiento" s
+          WHERE s."prospecto_id"=p."id" AND s."responsable_id"=${userId}
+        )
+      )
   `;
   return Number(asignado[0]?.total ?? 0) > 0;
 }
