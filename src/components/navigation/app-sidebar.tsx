@@ -2,6 +2,7 @@
 
 import {
   AppWindowIcon,
+  BarChart3Icon,
   CalendarIcon,
   CommandIcon,
   NotebookIcon,
@@ -26,9 +27,14 @@ import {
 const data = {
   navMain: [
     {
-      title: "Dashboard",
+      title: "Dashboard Time",
       url: "/dashboard",
       icon: AppWindowIcon,
+    },
+    {
+      title: "Dashboard Comercial",
+      url: "/dashboard-comercial",
+      icon: BarChart3Icon,
     },
     {
       title: "Prospectos",
