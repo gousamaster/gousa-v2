@@ -7,6 +7,12 @@ import { ensureClienteDocumentosSchema, TIPOS_DOCUMENTO_CLIENTE } from "@/lib/cl
 const MAX_BYTES = 3 * 1024 * 1024;
 const MIME_PERMITIDOS = new Set(["application/pdf","image/jpeg","image/png"]);
 
+function errorPayload(e:unknown,mensaje:string){
+  const detalle=e instanceof Error?e.message:String(e);
+  const codigo=typeof e==="object"&&e!==null&&"code" in e?String((e as {code?:unknown}).code??""):undefined;
+  return process.env.VERCEL_ENV==="preview"?{error:mensaje,detalle,codigo}:{error:mensaje};
+}
+
 export async function GET(_request:Request,{params}:{params:Promise<{id:string}>}){
   try{
     await ensureClienteDocumentosSchema();
@@ -22,7 +28,7 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string}>
       WHERE d."clienteId"=${id}
       ORDER BY d."tipo" ASC`;
     return NextResponse.json({documentos:docs});
-  }catch(e){console.error(e);return NextResponse.json({error:"No se pudieron cargar los documentos"},{status:500})}
+  }catch(e){console.error("documentos GET",e);return NextResponse.json(errorPayload(e,"No se pudieron cargar los documentos"),{status:500})}
 }
 
 export async function POST(request:Request,{params}:{params:Promise<{id:string}>}){
@@ -53,5 +59,5 @@ export async function POST(request:Request,{params}:{params:Promise<{id:string}>
         "subidoPorId"=EXCLUDED."subidoPorId",
         "updatedAt"=NOW()`;
     return NextResponse.json({ok:true});
-  }catch(e){console.error(e);return NextResponse.json({error:"No se pudo guardar el documento"},{status:500})}
+  }catch(e){console.error("documentos POST",e);return NextResponse.json(errorPayload(e,"No se pudo guardar el documento"),{status:500})}
 }
