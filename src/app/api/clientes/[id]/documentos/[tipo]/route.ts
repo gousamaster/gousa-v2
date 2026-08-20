@@ -18,6 +18,6 @@ export async function GET(_request:Request,{params}:{params:Promise<{id:string;t
     const doc=rows[0];
     if(!doc)return NextResponse.json({error:"Documento no encontrado"},{status:404});
     const safeName=doc.nombreArchivo.replace(/[\r\n"]/g,"_");
-    return new NextResponse(doc.contenido,{headers:{"Content-Type":doc.mimeType,"Content-Disposition":`inline; filename="${safeName}"`,`Cache-Control`:"private, no-store"}});
+    return new NextResponse(doc.contenido,{headers:{"Content-Type":doc.mimeType,"Content-Disposition":`inline; filename="${safeName}"`,"Cache-Control":"private, no-store"}});
   }catch(e){console.error(e);return NextResponse.json({error:"No se pudo abrir el documento"},{status:500})}
 }
