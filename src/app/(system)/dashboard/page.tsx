@@ -6,7 +6,7 @@ import { DashboardBienvenida } from "@/components/system/dashboard/dashboard-bie
 import { DashboardContainer } from "@/components/system/dashboard/dashboard-container";
 import { auth } from "@/lib/auth";
 
-const ROLES_GERENCIALES = ["MANAGER", "ADMIN", "SUPER_ADMIN"] as const;
+const ROLES_GERENCIALES = ["MANAGER", "SUPER_ADMIN"] as const;
 
 type RolGerencial = (typeof ROLES_GERENCIALES)[number];
 
