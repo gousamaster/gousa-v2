@@ -38,6 +38,12 @@ function formatDate(value: string) {
   });
 }
 
+function minFechaSeguimiento() {
+  const now = new Date();
+  const local = new Date(now.getTime() - now.getTimezoneOffset() * 60_000);
+  return local.toISOString().slice(0, 16);
+}
+
 export function ProspectoSeguimiento({
   prospectoId,
   convertido,
@@ -100,6 +106,12 @@ export function ProspectoSeguimiento({
       return;
     }
 
+    const fechaSeleccionada = new Date(programadoAt);
+    if (fechaSeleccionada.getTime() <= Date.now()) {
+      setError("La fecha y hora del seguimiento deben ser posteriores al momento actual");
+      return;
+    }
+
     try {
       setSaving(true);
       setError("");
@@ -109,7 +121,7 @@ export function ProspectoSeguimiento({
         body: JSON.stringify({
           tipo,
           accion,
-          programadoAt: new Date(programadoAt).toISOString(),
+          programadoAt: fechaSeleccionada.toISOString(),
           responsableId: responsableId || undefined,
           notas,
         }),
@@ -237,9 +249,11 @@ export function ProspectoSeguimiento({
                   <Label>Fecha y hora *</Label>
                   <Input
                     type="datetime-local"
+                    min={minFechaSeguimiento()}
                     value={programadoAt}
                     onChange={(event) => setProgramadoAt(event.target.value)}
                   />
+                  <p className="text-xs text-muted-foreground">Solo se permiten fechas y horas futuras.</p>
                 </div>
 
                 <div className="space-y-2 md:col-span-2">
