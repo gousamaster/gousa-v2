@@ -4,6 +4,7 @@ import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { randomUUID } from "crypto";
 import { esOrigenProspecto } from "@/lib/prospectos/origenes";
+import { detectarProspectoDuplicado } from "@/lib/prospectos/deduplicacion";
 
 const ESTADOS = ["NUEVO", "CONTACTADO", "CALIFICADO", "SEGUIMIENTO", "PERDIDO"] as const;
 const ESTADOS_CONTACTO = ["CONTACTADO", "CALIFICADO", "SEGUIMIENTO"] as const;
@@ -80,6 +81,25 @@ export async function PATCH(
     const origenDetalle = typeof body.origenDetalle === "string" ? body.origenDetalle.trim() || null : null;
     const cambioEstado = estado !== prospectoActual.estado;
     const registrarPrimerContacto = ESTADOS_CONTACTO.includes(estado as (typeof ESTADOS_CONTACTO)[number]);
+
+    const telefonoSolicitado = typeof body.telefono === "string" ? body.telefono.trim() : prospectoActual.telefono;
+    const emailSolicitado = typeof body.email === "string" ? body.email.trim() || null : prospectoActual.email;
+    const identidades = await db.prospecto.findMany({
+      where: { deletedAt: null },
+      select: { id: true, nombres: true, apellidos: true, telefono: true, email: true, convertido: true },
+    });
+    const duplicado = detectarProspectoDuplicado(identidades, telefonoSolicitado, emailSolicitado, prospectoId);
+    if (duplicado) {
+      const nombre = `${duplicado.prospecto.nombres} ${duplicado.prospecto.apellidos ?? ""}`.trim();
+      return NextResponse.json(
+        {
+          error: `No se puede guardar: ${duplicado.coincidencia === "EMAIL" ? "el email" : duplicado.coincidencia === "TELEFONO" ? "el teléfono" : "el teléfono y email"} ya pertenecen a ${nombre}.`,
+          code: "PROSPECTO_DUPLICADO",
+          duplicado: { id: duplicado.prospecto.id, nombre, coincidencia: duplicado.coincidencia },
+        },
+        { status: 409 },
+      );
+    }
 
     const prospecto = await db.$transaction(async (tx) => {
       const actualizado = await tx.prospecto.update({
