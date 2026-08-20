@@ -4,6 +4,11 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { ensureClienteDocumentosSchema, TIPOS_DOCUMENTO_CLIENTE } from "@/lib/cliente-documentos-schema";
 
+function asciiFilename(nombre:string){
+  const limpio=nombre.normalize("NFKD").replace(/[^\x20-\x7E]/g,"_").replace(/[\\\r\n"]/g,"_");
+  return limpio || "documento";
+}
+
 export async function GET(_request:Request,{params}:{params:Promise<{clienteId:string;tipo:string}>}){
   try{
     await ensureClienteDocumentosSchema();
@@ -17,7 +22,18 @@ export async function GET(_request:Request,{params}:{params:Promise<{clienteId:s
       WHERE "clienteId"=${clienteId} AND "tipo"=${t} LIMIT 1`;
     const doc=rows[0];
     if(!doc)return NextResponse.json({error:"Documento no encontrado"},{status:404});
-    const safeName=doc.nombreArchivo.replace(/[\r\n"]/g,"_");
-    return new NextResponse(doc.contenido,{headers:{"Content-Type":doc.mimeType,"Content-Disposition":`inline; filename="${safeName}"`,"Cache-Control":"private, no-store"}});
-  }catch(e){console.error(e);return NextResponse.json({error:"No se pudo abrir el documento"},{status:500})}
+
+    const fallback=asciiFilename(doc.nombreArchivo);
+    const encoded=encodeURIComponent(doc.nombreArchivo);
+    const disposition=`inline; filename="${fallback}"; filename*=UTF-8''${encoded}`;
+
+    return new NextResponse(doc.contenido,{headers:{
+      "Content-Type":doc.mimeType,
+      "Content-Disposition":disposition,
+      "Cache-Control":"private, no-store"
+    }});
+  }catch(e){
+    console.error("documentos preview GET",e);
+    return NextResponse.json({error:"No se pudo abrir el documento"},{status:500});
+  }
 }
