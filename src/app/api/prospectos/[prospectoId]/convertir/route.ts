@@ -1,5 +1,6 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
+import { randomUUID } from "crypto";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
@@ -91,6 +92,14 @@ export async function POST(
           },
         },
       });
+
+      const historialId = randomUUID();
+      await tx.$executeRaw`
+        INSERT INTO "prospecto_historial"
+          ("id", "prospecto_id", "estado_anterior", "estado_nuevo", "motivo_perdida", "cambiado_por_id", "created_at")
+        VALUES
+          (${historialId}, ${prospecto.id}, ${prospecto.estado}, 'CONVERTIDO', NULL, ${session.user.id}, CURRENT_TIMESTAMP)
+      `;
 
       return { cliente, prospecto: prospectoActualizado };
     });
