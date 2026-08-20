@@ -3,17 +3,28 @@ import { headers } from "next/headers";
 import { db } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { randomUUID } from "crypto";
+import { esOrigenProspecto } from "@/lib/prospectos/origenes";
 
 const ESTADOS = ["NUEVO", "CONTACTADO", "CALIFICADO", "SEGUIMIENTO", "PERDIDO"] as const;
+const ESTADOS_CONTACTO = ["CONTACTADO", "CALIFICADO", "SEGUIMIENTO"] as const;
 
-type PerdidaRow = { motivoPerdida: string | null; perdidoAt: Date | null };
+type ExtraRow = {
+  motivoPerdida: string | null;
+  perdidoAt: Date | null;
+  origenDetalle: string | null;
+  primerContactoAt: Date | null;
+};
 
-async function datosPerdida(prospectoId: string) {
-  const rows = await db.$queryRaw<PerdidaRow[]>`
-    SELECT "motivo_perdida" AS "motivoPerdida", "perdido_at" AS "perdidoAt"
+async function datosExtra(prospectoId: string) {
+  const rows = await db.$queryRaw<ExtraRow[]>`
+    SELECT
+      "motivo_perdida" AS "motivoPerdida",
+      "perdido_at" AS "perdidoAt",
+      "origen_detalle" AS "origenDetalle",
+      "primer_contacto_at" AS "primerContactoAt"
     FROM "prospecto" WHERE "id" = ${prospectoId} LIMIT 1
   `;
-  return rows[0] ?? { motivoPerdida: null, perdidoAt: null };
+  return rows[0] ?? { motivoPerdida: null, perdidoAt: null, origenDetalle: null, primerContactoAt: null };
 }
 
 export async function GET(
@@ -31,8 +42,8 @@ export async function GET(
       },
     });
     if (!prospecto) return NextResponse.json({ error: "Prospecto no encontrado" }, { status: 404 });
-    const perdida = await datosPerdida(prospectoId);
-    return NextResponse.json({ prospecto: { ...prospecto, ...perdida } });
+    const extra = await datosExtra(prospectoId);
+    return NextResponse.json({ prospecto: { ...prospecto, ...extra } });
   } catch (error) {
     console.error("Error al obtener prospecto:", error);
     return NextResponse.json({ error: "No se pudo obtener el prospecto" }, { status: 500 });
@@ -62,7 +73,13 @@ export async function PATCH(
       return NextResponse.json({ error: "El motivo de pérdida es obligatorio" }, { status: 400 });
     }
 
+    const origenSolicitado = typeof body.origen === "string" ? body.origen.trim().toUpperCase() : prospectoActual.origen;
+    if (origenSolicitado && origenSolicitado !== prospectoActual.origen && !esOrigenProspecto(origenSolicitado)) {
+      return NextResponse.json({ error: "Origen del prospecto no válido" }, { status: 400 });
+    }
+    const origenDetalle = typeof body.origenDetalle === "string" ? body.origenDetalle.trim() || null : null;
     const cambioEstado = estado !== prospectoActual.estado;
+    const registrarPrimerContacto = ESTADOS_CONTACTO.includes(estado as (typeof ESTADOS_CONTACTO)[number]);
 
     const prospecto = await db.$transaction(async (tx) => {
       const actualizado = await tx.prospecto.update({
@@ -74,7 +91,7 @@ export async function PATCH(
           email: typeof body.email === "string" ? body.email.trim() || null : undefined,
           ciudad: typeof body.ciudad === "string" ? body.ciudad.trim() || null : undefined,
           pais: typeof body.pais === "string" ? body.pais.trim() || null : undefined,
-          origen: typeof body.origen === "string" ? body.origen.trim() || null : undefined,
+          origen: typeof origenSolicitado === "string" ? origenSolicitado || null : undefined,
           interes: typeof body.interes === "string" ? body.interes.trim() || null : undefined,
           observaciones: typeof body.observaciones === "string" ? body.observaciones.trim() || null : undefined,
           estado,
@@ -101,6 +118,20 @@ export async function PATCH(
         `;
       }
 
+      await tx.$executeRaw`
+        UPDATE "prospecto"
+        SET "origen_detalle" = ${origenDetalle}
+        WHERE "id" = ${prospectoId}
+      `;
+
+      if (registrarPrimerContacto) {
+        await tx.$executeRaw`
+          UPDATE "prospecto"
+          SET "primer_contacto_at" = COALESCE("primer_contacto_at", CURRENT_TIMESTAMP)
+          WHERE "id" = ${prospectoId}
+        `;
+      }
+
       if (cambioEstado) {
         const historialId = randomUUID();
         const motivoHistorial = estado === "PERDIDO" ? motivoPerdida : null;
@@ -115,8 +146,8 @@ export async function PATCH(
       return actualizado;
     });
 
-    const perdida = await datosPerdida(prospectoId);
-    return NextResponse.json({ prospecto: { ...prospecto, ...perdida } });
+    const extra = await datosExtra(prospectoId);
+    return NextResponse.json({ prospecto: { ...prospecto, ...extra } });
   } catch (error) {
     console.error("Error al actualizar prospecto:", error);
     return NextResponse.json({ error: "No se pudo actualizar el prospecto" }, { status: 500 });
