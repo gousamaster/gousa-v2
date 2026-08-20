@@ -1,65 +1,37 @@
 // src/lib/utils/date-timezone.ts
 
-/**
- * TIMEZONE DE BOLIVIA: UTC-4
- * Todas las citas son en hora de La Paz
- */
+/** TIMEZONE DE BOLIVIA: UTC-4. Todas las citas se interpretan en hora de La Paz. */
 const BOLIVIA_OFFSET_HOURS = -4;
 const BOLIVIA_OFFSET_MS = BOLIVIA_OFFSET_HOURS * 60 * 60 * 1000;
 
 /**
- * Convierte datetime-local a Date para guardar en BD
- * Compensa el offset de Bolivia para que PostgreSQL guarde la hora correcta
- *
- * @example
- * Input: "2024-02-18T08:00" (usuario quiere 8 AM Bolivia)
- * Output: Date que PG guardará como "2024-02-18 08:00:00" efectivo
+ * Convierte datetime-local (sin zona) al instante UTC equivalente en Bolivia.
+ * Ejemplo: 2026-08-20T20:00 Bolivia = 2026-08-21T00:00:00.000Z.
  */
 export function parseLocalDateTime(dateTimeString: string): Date {
   const [datePart, timePart] = dateTimeString.split("T");
   const [year, month, day] = datePart.split("-").map(Number);
   const [hours, minutes] = timePart.split(":").map(Number);
-
-  // Crear en UTC con la hora deseada
-  const date = new Date(Date.UTC(year, month - 1, day, hours, minutes, 0, 0));
-
-  // Compensar: PG sumará 4h al convertir a UTC, nosotros restamos 4h antes
-  return new Date(date.getTime() + BOLIVIA_OFFSET_MS);
+  const wallClockAsUtc = Date.UTC(year, month - 1, day, hours, minutes, 0, 0);
+  return new Date(wallClockAsUtc - BOLIVIA_OFFSET_MS);
 }
 
-/**
- * Convierte Date de la BD a string para input datetime-local
- *
- * @param date - Date object de la BD
- * @returns String formato "YYYY-MM-DDTHH:mm"
- */
+/** Convierte Date de BD a datetime-local usando siempre America/La_Paz. */
 export function formatForDateTimeLocal(date: Date): string {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  const hours = String(date.getHours()).padStart(2, "0");
-  const minutes = String(date.getMinutes()).padStart(2, "0");
-
-  return `${year}-${month}-${day}T${hours}:${minutes}`;
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/La_Paz", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) => parts.find((p) => p.type === type)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
 }
 
-/**
- * Ajusta Date de la BD para display correcto en componentes
- * Compensa la conversión automática de timezone del browser
- *
- * @example
- * BD tiene: "2024-02-18T12:00:00.000Z" (UTC)
- * JS muestra: 08:00 (Bolivia local)
- * Queremos: 12:00 (la hora original)
- *
- * @param date - Date object de la BD
- * @returns Date ajustado para mostrar hora correcta
- */
+/** Compatibilidad con componentes que esperan un Date ajustado para display. */
 export function adjustDateForDisplay(date: Date): Date {
-  // Obtener el offset del browser en milisegundos
-  const offsetMs = date.getTimezoneOffset() * 60 * 1000;
-
-  // Sumar el offset para cancelar la conversión automática
-  // Esto hace que la "hora UTC" se muestre como "hora local"
-  return new Date(date.getTime() + offsetMs);
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/La_Paz", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23",
+  }).formatToParts(date);
+  const get = (type: Intl.DateTimeFormatPartTypes) => Number(parts.find((p) => p.type === type)?.value ?? 0);
+  return new Date(get("year"), get("month") - 1, get("day"), get("hour"), get("minute"), get("second"));
 }
