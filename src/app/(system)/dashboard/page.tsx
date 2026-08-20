@@ -5,6 +5,7 @@ import { redirect } from "next/navigation";
 import { DashboardAccesosComerciales } from "@/components/system/dashboard/dashboard-accesos-comerciales";
 import { DashboardBienvenida } from "@/components/system/dashboard/dashboard-bienvenida";
 import { DashboardContainer } from "@/components/system/dashboard/dashboard-container";
+import { DashboardProspectosEquipo } from "@/components/system/dashboard/dashboard-prospectos-equipo";
 import { DashboardProspectosMetricas } from "@/components/system/dashboard/dashboard-prospectos-metricas";
 import { auth } from "@/lib/auth";
 
@@ -32,6 +33,7 @@ export default async function DashboardPage() {
       <div className="flex-1">
         <DashboardAccesosComerciales />
         <DashboardProspectosMetricas />
+        <DashboardProspectosEquipo />
         <DashboardContainer nombreUsuario={session.user.name} rol={rol} />
       </div>
     );
