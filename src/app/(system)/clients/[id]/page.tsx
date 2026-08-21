@@ -2,45 +2,73 @@
 
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { ClienteCitasTab } from "@/components/system/citas/cliente-citas-tab";
 import { DescargaFichaButton } from "@/components/system/clientes/descarga-ficha-button";
 import { ClienteMigratorioTab } from "@/components/system/clientes/cliente-migratorio-tab";
 import { ClienteServiciosTab } from "@/components/system/tramites/cliente-servicios-tab";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { obtenerClientePorId } from "@/lib/actions/clientes/clientes-actions";
 import { auth } from "@/lib/auth";
-import Link from "next/link";
-import { Button } from "@/components/ui/button";
+import { db } from "@/lib/db";
+import { etiquetaOrigenProspecto } from "@/lib/prospectos/origenes";
 
 interface ClientePerfilPageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function ClientePerfilPage({
-  params,
-}: ClientePerfilPageProps) {
+type OrigenComercialRow = {
+  prospectoId: string;
+  origen: string | null;
+  score: number | null;
+  interes: string | null;
+  responsableNombre: string | null;
+  creadoPorNombre: string | null;
+  convertidoPorNombre: string | null;
+  convertidoAt: Date | null;
+};
+
+export default async function ClientePerfilPage({ params }: ClientePerfilPageProps) {
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/sign-in");
 
   const { id } = await params;
-  const result = await obtenerClientePorId(id);
+  const [result, origenRows] = await Promise.all([
+    obtenerClientePorId(id),
+    db.$queryRaw<OrigenComercialRow[]>`
+      SELECT
+        p."id" AS "prospectoId",
+        p."origen",
+        p."scorePreliminar" AS "score",
+        p."interes",
+        responsable."name" AS "responsableNombre",
+        creador."name" AS "creadoPorNombre",
+        convertidor."name" AS "convertidoPorNombre",
+        p."convertidoAt" AS "convertidoAt"
+      FROM "prospecto" p
+      LEFT JOIN "user" responsable ON responsable."id"=p."responsable_comercial_id"
+      LEFT JOIN "user" creador ON creador."id"=p."creadoPorId"
+      LEFT JOIN "user" convertidor ON convertidor."id"=p."convertidoPorId"
+      WHERE p."clienteId"=${id} AND p."deletedAt" IS NULL
+      LIMIT 1
+    `,
+  ]);
 
   if (!result.success || !result.data) redirect("/clients");
 
   const cliente = result.data;
-  const tieneGrupoFamiliar =
-    cliente.gruposFamiliares && cliente.gruposFamiliares.length > 0;
+  const origenComercial = origenRows[0] ?? null;
+  const tieneGrupoFamiliar = cliente.gruposFamiliares && cliente.gruposFamiliares.length > 0;
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
       <div className="flex items-center justify-between">
         <div>
-          <h2 className="text-3xl font-bold tracking-tight">
-            {cliente.nombres} {cliente.apellidos}
-          </h2>
+          <h2 className="text-3xl font-bold tracking-tight">{cliente.nombres} {cliente.apellidos}</h2>
           <p className="text-muted-foreground">
-            {cliente.region?.nombre} ·{" "}
-            {cliente.tipoCliente === "ADULTO" ? "Adulto" : "Infante"}
+            {cliente.region?.nombre} · {cliente.tipoCliente === "ADULTO" ? "Adulto" : "Infante"}
           </p>
         </div>
 
@@ -57,11 +85,28 @@ export default async function ClientePerfilPage({
         </div>
       </div>
 
+      {origenComercial && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Origen comercial NEXUS</CardTitle>
+            <p className="text-sm text-muted-foreground">Trazabilidad conservada desde el prospecto que originó este cliente.</p>
+          </CardHeader>
+          <CardContent className="grid gap-4 text-sm sm:grid-cols-2 lg:grid-cols-4">
+            <div><p className="text-muted-foreground">Fuente</p><p className="font-medium">{etiquetaOrigenProspecto(origenComercial.origen)}</p></div>
+            <div><p className="text-muted-foreground">Score NEXUS</p><p className="font-medium">{origenComercial.score == null ? "Sin evaluar" : `${origenComercial.score}%`}</p></div>
+            <div><p className="text-muted-foreground">Responsable Comercial</p><p className="font-medium">{origenComercial.responsableNombre || "Sin responsable"}</p></div>
+            <div><p className="text-muted-foreground">Interés inicial</p><p className="font-medium">{origenComercial.interes || "Sin definir"}</p></div>
+            <div><p className="text-muted-foreground">Prospecto registrado por</p><p className="font-medium">{origenComercial.creadoPorNombre || "Sin identificar"}</p></div>
+            <div><p className="text-muted-foreground">Conversión realizada por</p><p className="font-medium">{origenComercial.convertidoPorNombre || "Sin identificar"}</p></div>
+            <div><p className="text-muted-foreground">Fecha de conversión</p><p className="font-medium">{origenComercial.convertidoAt ? origenComercial.convertidoAt.toLocaleString("es-BO", { dateStyle: "medium", timeStyle: "short" }) : "Sin registrar"}</p></div>
+            <div><p className="text-muted-foreground">Prospecto origen</p><Button asChild variant="outline" size="sm" className="mt-1"><Link href={`/prospectos/${origenComercial.prospectoId}`}>Abrir prospecto</Link></Button></div>
+          </CardContent>
+        </Card>
+      )}
+
       <Tabs defaultValue="servicios">
         <TabsList>
-          <TabsTrigger value="migratorio">
-  Migratorio
-</TabsTrigger>
+          <TabsTrigger value="migratorio">Migratorio</TabsTrigger>
           <TabsTrigger value="servicios">Servicios y Trámites</TabsTrigger>
           <TabsTrigger value="citas">Citas</TabsTrigger>
         </TabsList>
@@ -74,11 +119,8 @@ export default async function ClientePerfilPage({
           <ClienteCitasTab clienteId={cliente.id} />
         </TabsContent>
         <TabsContent value="migratorio" className="mt-4">
-  <ClienteMigratorioTab
-    clienteId={cliente.id}
-    datosMigratorios={cliente.datosMigratorios}
-  />
-</TabsContent>
+          <ClienteMigratorioTab clienteId={cliente.id} datosMigratorios={cliente.datosMigratorios} />
+        </TabsContent>
       </Tabs>
     </div>
   );
