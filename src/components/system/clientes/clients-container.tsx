@@ -1,13 +1,13 @@
-// src/components/system/clientes/clients-container.tsx
-
 "use client";
 
 import { useEffect, useState } from "react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { obtenerTodasLasRegiones } from "@/lib/actions/catalogos/regiones-actions";
-import { obtenerTodosLosClientes } from "@/lib/actions/clientes/clientes-actions";
-import type { ClienteListItem } from "@/types/cliente-types";
+import {
+  obtenerClientesParaGestionComercial,
+  type ClienteGestionComercial,
+} from "@/lib/actions/prospectos/prospecto-cliente-actions";
 import { ClientList } from "./client-list";
 
 function LoadingSkeleton() {
@@ -18,7 +18,7 @@ function LoadingSkeleton() {
           <Skeleton className="h-6 w-48" />
         </CardHeader>
         <CardContent>
-          <Skeleton className="h-10 w-full mb-4" />
+          <Skeleton className="mb-4 h-10 w-full" />
           <div className="space-y-2">
             {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={`skeleton-${i}`} className="h-16 w-full" />
@@ -30,37 +30,21 @@ function LoadingSkeleton() {
   );
 }
 
-/**
- * Contenedor principal para el módulo de clientes
- * Implementa patrón Facade para simplificar la carga de datos
- * y proporcionar una interfaz unificada a los componentes hijos
- */
 export function ClientsContainer() {
   const [isLoading, setIsLoading] = useState(true);
-  const [clientes, setClientes] = useState<ClienteListItem[]>([]);
-  const [regiones, setRegiones] = useState<
-    Array<{ id: string; nombre: string }>
-  >([]);
+  const [clientes, setClientes] = useState<ClienteGestionComercial[]>([]);
+  const [regiones, setRegiones] = useState<Array<{ id: string; nombre: string }>>([]);
 
   const loadData = async () => {
     setIsLoading(true);
     try {
       const [clientesResult, regionesResult] = await Promise.all([
-        obtenerTodosLosClientes(),
+        obtenerClientesParaGestionComercial(),
         obtenerTodasLasRegiones(),
       ]);
 
-      setClientes(
-        clientesResult.success && clientesResult.data
-          ? clientesResult.data
-          : [],
-      );
-
-      setRegiones(
-        regionesResult.success && regionesResult.data
-          ? regionesResult.data
-          : [],
-      );
+      setClientes(clientesResult.success && clientesResult.data ? clientesResult.data : []);
+      setRegiones(regionesResult.success && regionesResult.data ? regionesResult.data : []);
     } catch (error) {
       console.error("Error loading clients data:", error);
     } finally {
@@ -78,9 +62,7 @@ export function ClientsContainer() {
         <div className="flex items-center justify-between">
           <div>
             <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
-            <p className="text-muted-foreground">
-              Gestiona los clientes y sus datos
-            </p>
+            <p className="text-muted-foreground">Gestiona los clientes y sus datos</p>
           </div>
         </div>
         <LoadingSkeleton />
@@ -93,16 +75,10 @@ export function ClientsContainer() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
-          <p className="text-muted-foreground">
-            Gestiona los clientes y sus datos
-          </p>
+          <p className="text-muted-foreground">Gestiona clientes y detecta registros que todavía no contrataron un servicio.</p>
         </div>
       </div>
-      <ClientList
-        initialClientes={clientes}
-        regiones={regiones}
-        onRefresh={loadData}
-      />
+      <ClientList initialClientes={clientes} regiones={regiones} onRefresh={loadData} />
     </div>
   );
 }
