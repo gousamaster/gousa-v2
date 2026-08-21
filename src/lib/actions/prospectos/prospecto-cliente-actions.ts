@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { registrarAuditoriaProspecto } from "@/lib/prospectos/auditoria";
 import { detectarProspectoDuplicado } from "@/lib/prospectos/deduplicacion";
+import { puedeAccederProspecto } from "@/lib/prospectos/permisos";
 import type { ActionResult } from "@/types/action-result-types";
 import type { ClienteListItem } from "@/types/cliente-types";
 import {
@@ -21,6 +22,9 @@ export type ClienteGestionComercial = ClienteListItem & {
 
 export async function obtenerClientesParaGestionComercial(): Promise<ActionResult<ClienteGestionComercial[]>> {
   try {
+    const session = await auth.api.getSession({ headers: await headers() });
+    if (!session?.user?.id) return { success: false, error: "No autorizado" };
+
     const clientes = await db.cliente.findMany({
       where: { deletedAt: null },
       select: {
@@ -71,6 +75,9 @@ export async function convertirProspectoAClienteCompleto(
   try {
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) return { success: false, error: "No autorizado" };
+    if (!(await puedeAccederProspecto(session.user.id, prospectoId))) {
+      return { success: false, error: "Sin permiso para convertir este prospecto" };
+    }
 
     const validated = createClienteCompletoSchema.parse(input);
 
