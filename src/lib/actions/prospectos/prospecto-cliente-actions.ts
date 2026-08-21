@@ -109,12 +109,12 @@ export async function convertirClienteSinServicioAProspecto(
     const cliente = await db.cliente.findFirst({
       where: { id: clienteId, deletedAt: null },
       include: {
-        _count: { select: { servicios: true, tramites: true, citas: true } },
+        _count: { select: { servicios: true, tramites: true } },
       },
     });
     if (!cliente) return { success: false, error: "Cliente no encontrado" };
-    if (cliente._count.servicios > 0 || cliente._count.tramites > 0 || cliente._count.citas > 0) {
-      return { success: false, error: "Este cliente ya tiene servicios, trámites o citas y no puede volver a Prospectos" };
+    if (cliente._count.servicios > 0 || cliente._count.tramites > 0) {
+      return { success: false, error: "Este cliente ya tiene servicio o trámite y no puede volver a Prospectos" };
     }
 
     const identidades = await db.prospecto.findMany({
