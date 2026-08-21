@@ -31,7 +31,7 @@ export async function DashboardComercialPersonal({ userId, nombre }: { userId: s
         COUNT(*) AS "total",
         COUNT(*) FILTER (WHERE "convertido"=false AND "estado"<>'PERDIDO') AS "activos",
         COUNT(*) FILTER (WHERE "convertido"=true) AS "convertidos",
-        COUNT(*) FILTER (WHERE "convertido"=false AND "scorePreliminar">=75) AS "altaPrioridad",
+        COUNT(*) FILTER (WHERE "convertido"=false AND "estado"<>'PERDIDO' AND "scorePreliminar">=75) AS "altaPrioridad",
         COUNT(*) FILTER (WHERE "convertido"=false AND "estado"='PERDIDO') AS "perdidos"
       FROM "prospecto"
       WHERE "deletedAt" IS NULL
@@ -39,8 +39,8 @@ export async function DashboardComercialPersonal({ userId, nombre }: { userId: s
     `,
     db.$queryRaw<SeguimientosRow[]>`
       SELECT
-        COUNT(*) FILTER (WHERE s."estado"='PENDIENTE') AS "pendientes",
-        COUNT(*) FILTER (WHERE s."estado"='PENDIENTE' AND s."programado_at"<CURRENT_TIMESTAMP) AS "vencidos",
+        COUNT(*) FILTER (WHERE s."estado"='PENDIENTE' AND p."convertido"=false AND p."estado"<>'PERDIDO') AS "pendientes",
+        COUNT(*) FILTER (WHERE s."estado"='PENDIENTE' AND s."programado_at"<CURRENT_TIMESTAMP AND p."convertido"=false AND p."estado"<>'PERDIDO') AS "vencidos",
         COUNT(*) FILTER (WHERE s."estado"='COMPLETADO') AS "completados"
       FROM "prospecto_seguimiento" s
       INNER JOIN "prospecto" p ON p."id"=s."prospecto_id"
@@ -69,9 +69,9 @@ export async function DashboardComercialPersonal({ userId, nombre }: { userId: s
     ["Mis clientes", clientes, "Clientes registrados por ti", UserRoundCheck],
     ["Mis ventas", `${ingresos.toLocaleString("es-BO")} Bs.`, "Servicios y citas vinculados a tu gestión", CircleDollarSign],
     ["Activos", numero(prospectos?.activos), "Prospectos todavía en gestión", CheckCircle2],
-    ["Prioridad alta", numero(prospectos?.altaPrioridad), "Score NEXUS de 75% o más", Target],
-    ["Seguimientos pendientes", numero(seguimientos?.pendientes), "Acciones que todavía debes realizar", CheckCircle2],
-    ["Vencidos", numero(seguimientos?.vencidos), "Acciones atrasadas de tu propia cartera", AlertTriangle],
+    ["Prioridad alta", numero(prospectos?.altaPrioridad), "Activos con Score NEXUS de 75% o más", Target],
+    ["Seguimientos pendientes", numero(seguimientos?.pendientes), "Acciones abiertas de prospectos activos", CheckCircle2],
+    ["Vencidos", numero(seguimientos?.vencidos), "Acciones atrasadas de tu cartera activa", AlertTriangle],
   ] as const;
 
   return (
@@ -100,7 +100,7 @@ export async function DashboardComercialPersonal({ userId, nombre }: { userId: s
         <CardHeader><CardTitle className="text-base">Mi seguimiento comercial</CardTitle></CardHeader>
         <CardContent className="grid gap-3 sm:grid-cols-3">
           <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Completados</p><p className="mt-1 text-2xl font-bold">{numero(seguimientos?.completados)}</p></div>
-          <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Pendientes</p><p className="mt-1 text-2xl font-bold">{numero(seguimientos?.pendientes)}</p></div>
+          <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Pendientes activos</p><p className="mt-1 text-2xl font-bold">{numero(seguimientos?.pendientes)}</p></div>
           <div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Prospectos perdidos</p><p className="mt-1 text-2xl font-bold">{numero(prospectos?.perdidos)}</p></div>
         </CardContent>
       </Card>
