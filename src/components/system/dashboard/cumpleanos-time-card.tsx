@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { Gift, MessageCircle, Phone, RefreshCcw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { obtenerCumpleanosHoy, type CumpleanosHoy } from "@/lib/actions/dashboard/dashboard-actions";
+import { obtenerCumpleanosHoy, type CumpleanosHoy } from "@/lib/actions/dashboard/cumpleanos-actions";
 
 function whatsappUrl(telefono:string){
   const limpio=telefono.replace(/\D/g,"");
