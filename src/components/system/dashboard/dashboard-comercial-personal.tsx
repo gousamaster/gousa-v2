@@ -46,7 +46,7 @@ export async function DashboardComercialPersonal({ userId, nombre }: { userId: s
       INNER JOIN "prospecto" p ON p."id"=s."prospecto_id"
       WHERE p."deletedAt" IS NULL AND s."responsable_id"=${userId}
     `,
-    db.cliente.count({ where: { registradoPorId: userId, deletedAt: null } }),
+    db.cliente.count({ where: { registradoPorId: userId, activo: true, deletedAt: null } }),
     db.clienteServicio.aggregate({
       where: { deletedAt: null, cliente: { registradoPorId: userId } },
       _sum: { precioFinal: true },
@@ -66,7 +66,7 @@ export async function DashboardComercialPersonal({ userId, nombre }: { userId: s
   const metricas = [
     ["Mi cartera", total, "Prospectos bajo tu responsabilidad", UsersRound],
     ["Mis cierres", convertidos, `${porcentaje(convertidos, total)}% de conversión`, Target],
-    ["Mis clientes", clientes, "Clientes registrados por ti", UserRoundCheck],
+    ["Mis clientes", clientes, "Clientes activos registrados por ti", UserRoundCheck],
     ["Mis ventas", `${ingresos.toLocaleString("es-BO")} Bs.`, "Servicios y citas vinculados a tu gestión", CircleDollarSign],
     ["Activos", numero(prospectos?.activos), "Prospectos todavía en gestión", CheckCircle2],
     ["Prioridad alta", numero(prospectos?.altaPrioridad), "Activos con Score NEXUS de 75% o más", Target],
