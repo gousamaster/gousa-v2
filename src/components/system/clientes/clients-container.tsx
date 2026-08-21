@@ -10,6 +10,7 @@ import {
 } from "@/lib/actions/prospectos/prospecto-cliente-actions";
 import { obtenerClientesConServicioHistoricoConfirmado } from "@/lib/actions/clientes/saneamiento-clientes-actions";
 import { ClientList } from "./client-list";
+import { AfiliadosPanel } from "./afiliados-panel";
 
 function LoadingSkeleton() {
   return <div className="space-y-6"><Card><CardHeader className="pb-2"><Skeleton className="h-6 w-48" /></CardHeader><CardContent><Skeleton className="mb-4 h-10 w-full" /><div className="space-y-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={`skeleton-${i}`} className="h-16 w-full" />)}</div></CardContent></Card></div>;
@@ -36,9 +37,9 @@ export function ClientsContainer() {
     } finally { setIsLoading(false); }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => { void loadData(); }, []);
 
   if (isLoading) return <div className="flex-1 space-y-6 p-8 pt-6"><div><h2 className="text-3xl font-bold tracking-tight">Clientes</h2><p className="text-muted-foreground">Gestiona los clientes y sus datos</p></div><LoadingSkeleton /></div>;
 
-  return <div className="flex-1 space-y-6 p-8 pt-6"><div><h2 className="text-3xl font-bold tracking-tight">Clientes</h2><p className="text-muted-foreground">Gestiona clientes y sanea los registros históricos antes de trabajar únicamente con datos reales de NEXUS.</p></div><ClientList initialClientes={clientes} regiones={regiones} onRefresh={loadData} /></div>;
+  return <div className="flex-1 space-y-6 p-8 pt-6"><div><h2 className="text-3xl font-bold tracking-tight">Clientes</h2><p className="text-muted-foreground">Gestiona clientes y sanea los registros históricos antes de trabajar únicamente con datos reales de NEXUS. Flujo: Prospecto → Cliente → Afiliado.</p></div><ClientList initialClientes={clientes} regiones={regiones} onRefresh={loadData} /><AfiliadosPanel clientes={clientes.filter((c) => c.activo)} /></div>;
 }
