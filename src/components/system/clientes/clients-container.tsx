@@ -8,26 +8,11 @@ import {
   obtenerClientesParaGestionComercial,
   type ClienteGestionComercial,
 } from "@/lib/actions/prospectos/prospecto-cliente-actions";
+import { obtenerClientesConServicioHistoricoConfirmado } from "@/lib/actions/clientes/saneamiento-clientes-actions";
 import { ClientList } from "./client-list";
 
 function LoadingSkeleton() {
-  return (
-    <div className="space-y-6">
-      <Card>
-        <CardHeader className="pb-2">
-          <Skeleton className="h-6 w-48" />
-        </CardHeader>
-        <CardContent>
-          <Skeleton className="mb-4 h-10 w-full" />
-          <div className="space-y-2">
-            {Array.from({ length: 8 }).map((_, i) => (
-              <Skeleton key={`skeleton-${i}`} className="h-16 w-full" />
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-    </div>
-  );
+  return <div className="space-y-6"><Card><CardHeader className="pb-2"><Skeleton className="h-6 w-48" /></CardHeader><CardContent><Skeleton className="mb-4 h-10 w-full" /><div className="space-y-2">{Array.from({ length: 8 }).map((_, i) => <Skeleton key={`skeleton-${i}`} className="h-16 w-full" />)}</div></CardContent></Card></div>;
 }
 
 export function ClientsContainer() {
@@ -38,47 +23,22 @@ export function ClientsContainer() {
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const [clientesResult, regionesResult] = await Promise.all([
+      const [clientesResult, regionesResult, historicosResult] = await Promise.all([
         obtenerClientesParaGestionComercial(),
         obtenerTodasLasRegiones(),
+        obtenerClientesConServicioHistoricoConfirmado(),
       ]);
-
-      setClientes(clientesResult.success && clientesResult.data ? clientesResult.data : []);
+      const historicos = new Set(historicosResult.success && historicosResult.data ? historicosResult.data : []);
+      setClientes(clientesResult.success && clientesResult.data ? clientesResult.data.map((c) => ({ ...c, servicioHistoricoConfirmado: historicos.has(c.id), sinServicio: c.sinServicio && !historicos.has(c.id) })) : []);
       setRegiones(regionesResult.success && regionesResult.data ? regionesResult.data : []);
     } catch (error) {
       console.error("Error loading clients data:", error);
-    } finally {
-      setIsLoading(false);
-    }
+    } finally { setIsLoading(false); }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
-  if (isLoading) {
-    return (
-      <div className="flex-1 space-y-6 p-8 pt-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
-            <p className="text-muted-foreground">Gestiona los clientes y sus datos</p>
-          </div>
-        </div>
-        <LoadingSkeleton />
-      </div>
-    );
-  }
+  if (isLoading) return <div className="flex-1 space-y-6 p-8 pt-6"><div><h2 className="text-3xl font-bold tracking-tight">Clientes</h2><p className="text-muted-foreground">Gestiona los clientes y sus datos</p></div><LoadingSkeleton /></div>;
 
-  return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
-          <p className="text-muted-foreground">Gestiona clientes y detecta registros que todavía no contrataron un servicio.</p>
-        </div>
-      </div>
-      <ClientList initialClientes={clientes} regiones={regiones} onRefresh={loadData} />
-    </div>
-  );
+  return <div className="flex-1 space-y-6 p-8 pt-6"><div><h2 className="text-3xl font-bold tracking-tight">Clientes</h2><p className="text-muted-foreground">Gestiona clientes y sanea los registros históricos antes de trabajar únicamente con datos reales de NEXUS.</p></div><ClientList initialClientes={clientes} regiones={regiones} onRefresh={loadData} /></div>;
 }
