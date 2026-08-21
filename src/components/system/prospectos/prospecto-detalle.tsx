@@ -19,7 +19,6 @@ type Prospecto = {
   convertidoPor?: { id: string; name: string; email: string } | null;
   cliente?: { id: string; nombres: string; apellidos: string } | null;
 };
-type Region = { id: string; nombre: string; codigo: string };
 const estados = ["NUEVO", "CONTACTADO", "CALIFICADO", "SEGUIMIENTO", "PERDIDO"];
 
 function formatDate(value?: string | null) {
@@ -40,15 +39,14 @@ export function ProspectoDetalle({ prospectoId }: { prospectoId: string }) {
   const [prospecto, setProspecto] = useState<Prospecto | null>(null);
   const [loading, setLoading] = useState(true); const [error, setError] = useState("");
   const [editing, setEditing] = useState(false); const [saving, setSaving] = useState(false);
-  const [editForm, setEditForm] = useState<Prospecto | null>(null); const [regiones, setRegiones] = useState<Region[]>([]);
-  const [showConvert, setShowConvert] = useState(false); const [regionId, setRegionId] = useState(""); const [converting, setConverting] = useState(false);
+  const [editForm, setEditForm] = useState<Prospecto | null>(null);
 
   useEffect(() => { (async () => {
     try { setLoading(true); setError("");
-      const [p, r] = await Promise.all([fetch(`/api/prospectos/${prospectoId}`, { cache: "no-store" }), fetch("/api/regiones", { cache: "no-store" })]);
-      const pd = await p.json(); const rd = await r.json();
-      if (!p.ok) throw new Error(pd.error || "No se pudo cargar el prospecto"); if (!r.ok) throw new Error(rd.error || "No se pudieron cargar las regiones");
-      setProspecto(pd.prospecto); setEditForm(pd.prospecto); setRegiones(rd.regiones ?? []);
+      const response = await fetch(`/api/prospectos/${prospectoId}`, { cache: "no-store" });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.error || "No se pudo cargar el prospecto");
+      setProspecto(data.prospecto); setEditForm(data.prospecto);
     } catch (e) { setError(e instanceof Error ? e.message : "No se pudo cargar el prospecto"); } finally { setLoading(false); }
   })(); }, [prospectoId]);
 
@@ -63,12 +61,6 @@ export function ProspectoDetalle({ prospectoId }: { prospectoId: string }) {
       setProspecto(data.prospecto); setEditForm(data.prospecto); setEditing(false);
     } catch (e) { setError(e instanceof Error ? e.message : "No se pudo actualizar el prospecto"); } finally { setSaving(false); }
   };
-  const convertProspecto = async () => {
-    if (!regionId) return setError("Selecciona la región del cliente antes de convertirlo");
-    try { setConverting(true); setError(""); const response = await fetch(`/api/prospectos/${prospectoId}/convertir`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ regionId }) });
-      const data = await response.json(); if (!response.ok) throw new Error(data.error || "No se pudo convertir el prospecto"); setProspecto(data.prospecto); setEditForm(data.prospecto); setShowConvert(false);
-    } catch (e) { setError(e instanceof Error ? e.message : "No se pudo convertir el prospecto"); } finally { setConverting(false); }
-  };
 
   if (loading) return <div className="flex-1 p-8 pt-6"><p className="text-sm text-muted-foreground">Cargando prospecto...</p></div>;
   if (error && !prospecto) return <div className="flex-1 space-y-4 p-8 pt-6"><Button variant="outline" onClick={() => router.push("/prospectos")}>Volver a prospectos</Button><p className="text-sm text-destructive">{error}</p></div>;
@@ -78,15 +70,15 @@ export function ProspectoDetalle({ prospectoId }: { prospectoId: string }) {
 
   return <div className="flex-1 space-y-6 p-8 pt-6">
     <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between"><div><Button variant="outline" className="mb-4" onClick={() => router.push("/prospectos")}>Volver a prospectos</Button><h2 className="text-3xl font-bold tracking-tight">{prospecto.nombres} {prospecto.apellidos ?? ""}</h2><p className="text-muted-foreground">Perfil comercial del prospecto</p></div><div className="flex flex-wrap items-center gap-2">
-      {!prospecto.convertido && !editing && prospecto.estado !== "PERDIDO" && <Button variant="outline" onClick={() => { setShowConvert(v => !v); setError(""); }}>Convertir en cliente</Button>}
-      {!prospecto.convertido && !editing && <Button onClick={() => { setEditForm(prospecto); setShowConvert(false); setError(""); setEditing(true); }}>Editar prospecto</Button>}
+      {!prospecto.convertido && !editing && prospecto.estado !== "PERDIDO" && <Button variant="outline" onClick={() => router.push(`/prospectos/${prospectoId}/convertir-cliente`)}>Convertir en cliente</Button>}
+      {!prospecto.convertido && !editing && <Button onClick={() => { setEditForm(prospecto); setError(""); setEditing(true); }}>Editar prospecto</Button>}
       {prospecto.convertido && prospecto.cliente && <Button onClick={() => router.push(`/clients/${prospecto.cliente?.id}`)}>Abrir cliente</Button>}
       {editing && <><Button variant="outline" onClick={() => { setEditForm(prospecto); setError(""); setEditing(false); }} disabled={saving}>Cancelar</Button><Button onClick={saveProspecto} disabled={saving}>{saving ? "Guardando..." : "Guardar cambios"}</Button></>}
       <span className="rounded-full border px-3 py-1 text-sm">{prospecto.estado}</span>{prospecto.convertido && <span className="rounded-full border px-3 py-1 text-sm">CONVERTIDO</span>}
     </div></div>
     {error && <p className="text-sm text-destructive">{error}</p>}
 
-    {showConvert && !prospecto.convertido && <Card><CardHeader><CardTitle>Convertir prospecto en cliente</CardTitle></CardHeader><CardContent className="space-y-4"><p className="text-sm text-muted-foreground">NEXUS copiará nombre, teléfono, email y país al nuevo cliente. La persona que realice esta acción quedará registrada como responsable de la conversión.</p><div className="max-w-md space-y-2"><Label>Región del cliente *</Label><select className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm" value={regionId} onChange={e => setRegionId(e.target.value)}><option value="">Selecciona una región</option>{regiones.map(r => <option key={r.id} value={r.id}>{r.nombre}</option>)}</select></div><div className="flex gap-2"><Button variant="outline" onClick={() => setShowConvert(false)}>Cancelar</Button><Button onClick={convertProspecto} disabled={converting || !regionId}>{converting ? "Convirtiendo..." : "Confirmar conversión"}</Button></div></CardContent></Card>}
+    {!prospecto.convertido && prospecto.estado !== "PERDIDO" && !editing && <Card><CardContent className="pt-6"><p className="text-sm text-muted-foreground">Al convertir, NEXUS abrirá la ficha completa de Cliente con estos datos precargados. El prospecto solo cambiará a CONVERTIDO después de guardar correctamente el alta completa.</p></CardContent></Card>}
 
     {editing && editForm ? <Card><CardHeader><CardTitle>Editar prospecto</CardTitle></CardHeader><CardContent className="grid gap-4 md:grid-cols-2">
       <div className="space-y-2"><Label>Nombres *</Label><Input value={editForm.nombres} onChange={e => updateField("nombres", e.target.value)} /></div><div className="space-y-2"><Label>Apellidos</Label><Input value={editForm.apellidos ?? ""} onChange={e => updateField("apellidos", e.target.value)} /></div>
