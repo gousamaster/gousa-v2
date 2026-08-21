@@ -19,6 +19,18 @@ export async function ensureDs160Schema() {
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`);
+    await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "tramite_ds160_evidencia" (
+      "id" TEXT NOT NULL PRIMARY KEY,
+      "tramiteId" TEXT NOT NULL REFERENCES "tramite"("id") ON DELETE CASCADE ON UPDATE CASCADE,
+      "estado" TEXT NOT NULL,
+      "nombreArchivo" TEXT NOT NULL,
+      "mimeType" TEXT NOT NULL,
+      "tamanoBytes" INTEGER NOT NULL,
+      "contenido" BYTEA NOT NULL,
+      "subidoPorId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )`);
+    await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "tramite_ds160_evidencia_tramite_idx" ON "tramite_ds160_evidencia"("tramiteId","createdAt")`);
     ready = true;
   })();
   try { await promise; } finally { if (!ready) promise = null; }
