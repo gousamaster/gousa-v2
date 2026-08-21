@@ -3,8 +3,7 @@
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { Clock3 } from "lucide-react";
-import { EntrevistasHoyCard } from "@/components/system/dashboard/entrevistas-hoy-card";
-import { AgendaHoyCard } from "@/components/system/dashboard/agenda-hoy-card";
+import { JornadaTimeCard } from "@/components/system/dashboard/jornada-time-card";
 import { CumpleanosTimeCard } from "@/components/system/dashboard/cumpleanos-time-card";
 import { PendientesTimeCard } from "@/components/system/dashboard/pendientes-time-card";
 import { auth } from "@/lib/auth";
@@ -17,11 +16,11 @@ function DashboardTime(){
           <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-blue-600 text-white shadow-sm"><Clock3 className="h-6 w-6"/></div>
           <div>
             <div className="flex flex-wrap items-center gap-2"><h1 className="text-xl font-bold tracking-tight">NEXUS · Dashboard Time</h1><span className="rounded-full border border-blue-200 bg-blue-100 px-2 py-0.5 text-[11px] font-semibold uppercase tracking-wide text-blue-700">Operación</span></div>
-            <p className="mt-1 text-sm text-muted-foreground">Tu agenda operativa compartida: entrevistas, simulacros, asesorías, recordatorios, cumpleaños y pendientes con fecha.</p>
+            <p className="mt-1 text-sm text-muted-foreground">Tu jornada compartida, ordenada por hora: entrevistas, simulacros, asesorías, actividades, cumpleaños y pendientes.</p>
           </div>
         </div>
       </div>
-      <div className="space-y-4"><EntrevistasHoyCard/><AgendaHoyCard/><CumpleanosTimeCard/><PendientesTimeCard/></div>
+      <div className="space-y-4"><JornadaTimeCard/><CumpleanosTimeCard/><PendientesTimeCard/></div>
     </section>
   );
 }
