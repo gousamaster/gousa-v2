@@ -101,8 +101,14 @@ export async function PATCH(request: Request, { params }: { params: Promise<{ pr
         },
       });
 
-      if (estado === "PERDIDO") await tx.$executeRaw`UPDATE "prospecto" SET "motivo_perdida" = ${motivoPerdida}, "perdido_at" = CURRENT_TIMESTAMP WHERE "id" = ${prospectoId}`;
-      else await tx.$executeRaw`UPDATE "prospecto" SET "motivo_perdida" = NULL, "perdido_at" = NULL WHERE "id" = ${prospectoId}`;
+      if (estado === "PERDIDO") {
+        await tx.$executeRaw`UPDATE "prospecto" SET "motivo_perdida" = ${motivoPerdida}, "perdido_at" = CURRENT_TIMESTAMP WHERE "id" = ${prospectoId}`;
+        if (cambioEstado) {
+          await tx.$executeRaw`UPDATE "prospecto_seguimiento" SET "estado"='CANCELADO', "completado_at"=CURRENT_TIMESTAMP, "notas_resultado"=COALESCE("notas_resultado",'') || CASE WHEN COALESCE("notas_resultado",'')='' THEN '' ELSE E'\n' END || 'Cancelado automáticamente: prospecto marcado como perdido.' WHERE "prospecto_id"=${prospectoId} AND "estado"='PENDIENTE'`;
+        }
+      } else {
+        await tx.$executeRaw`UPDATE "prospecto" SET "motivo_perdida" = NULL, "perdido_at" = NULL WHERE "id" = ${prospectoId}`;
+      }
 
       await tx.$executeRaw`UPDATE "prospecto" SET "origen_detalle" = ${origenDetalle} WHERE "id" = ${prospectoId}`;
       if (registrarPrimerContacto) await tx.$executeRaw`UPDATE "prospecto" SET "primer_contacto_at" = COALESCE("primer_contacto_at", CURRENT_TIMESTAMP) WHERE "id" = ${prospectoId}`;
