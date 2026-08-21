@@ -1,7 +1,7 @@
 export const ORIGENES_PROSPECTO = [
   { value: "WHATSAPP", label: "WhatsApp" },
-  { value: "FACEBOOK", label: "Facebook" },
-  { value: "INSTAGRAM", label: "Instagram" },
+  { value: "META", label: "Facebook / Instagram" },
+  { value: "TIKTOK", label: "TikTok" },
   { value: "WEB", label: "Sitio web" },
   { value: "REFERIDO", label: "Referido" },
   { value: "OFICINA", label: "Oficina" },
@@ -18,5 +18,7 @@ export function esOrigenProspecto(value: string): value is OrigenProspecto {
 
 export function etiquetaOrigenProspecto(value: string | null | undefined) {
   if (!value) return "Sin definir";
+  if (["META", "FACEBOOK", "INSTAGRAM"].includes(value)) return "Facebook / Instagram";
+  if (value === "TIKTOK") return "TikTok";
   return ORIGENES_PROSPECTO.find((item) => item.value === value)?.label ?? value;
 }
