@@ -13,7 +13,9 @@ async function enviarInvitacionEquipo(args:{titulo:string;detalle:string|null;fe
   const usuarios=await db.user.findMany({where:{status:"ACTIVE",email:{not:""}},select:{email:true,name:true}});
   const destinatarios=usuarios.map(u=>u.email).filter(Boolean);
   if(destinatarios.length===0)return {estado:"SIN_DESTINATARIOS",enviado:false};
-  const apiKey=process.env.RESEND_API_KEY,from=process.env.NEXUS_MAIL_FROM;
+  const apiKey=process.env.RESEND_API_KEY;
+  const resendDomain=process.env.RESEND_EMAIL_DOMAIN?.trim();
+  const from=process.env.NEXUS_MAIL_FROM?.trim() || (resendDomain ? `NEXUS Go USA <nexus@${resendDomain}>` : "");
   if(!apiKey||!from)return {estado:"CONFIGURAR_CORREO",enviado:false};
   const uid=`${randomUUID()}@nexus.gousa`;
   const ics=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//GO USA NEXUS//Dashboard Time//ES","CALSCALE:GREGORIAN","METHOD:REQUEST","BEGIN:VEVENT",`UID:${uid}`,`DTSTAMP:${new Date().toISOString().replace(/[-:]/g,"").replace(/\.\d{3}Z$/,"Z")}`,`DTSTART:${icsDate(args.fecha,args.horaInicio)}`,`DTEND:${icsDate(args.fecha,args.horaFin)}`,`SUMMARY:${escapeIcs(args.titulo)}`,`DESCRIPTION:${escapeIcs(args.detalle??"Actividad de equipo creada en NEXUS Dashboard Time")}`,"LOCATION:GO USA","STATUS:CONFIRMED","END:VEVENT","END:VCALENDAR"].join("\r\n");
