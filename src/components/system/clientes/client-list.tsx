@@ -1,17 +1,7 @@
-// src/components/system/clientes/client-list.tsx
-
 "use client";
 
 import type { RowSelectionState } from "@tanstack/react-table";
-import {
-  CheckSquare,
-  Plus,
-  Power,
-  PowerOff,
-  Search,
-  Trash2,
-  X,
-} from "lucide-react";
+import { CheckSquare, Plus, Power, PowerOff, Search, Trash2, X } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -28,57 +18,56 @@ import {
   toggleClienteActivo,
   toggleClientesActivoEnLote,
 } from "@/lib/actions/clientes/clientes-actions";
+import { convertirClienteSinServicioAProspecto } from "@/lib/actions/prospectos/prospecto-cliente-actions";
 import type { ClienteListItem } from "@/types/cliente-types";
 import { ClientFormDrawer } from "./client-form-drawer";
 import { createClientColumns } from "./client-table-columns";
 import { GrupoFamiliarDrawer } from "./grupo-familiar-drawer";
 
+type ClienteComercial = ClienteListItem & {
+  serviciosContratados?: number;
+  tramitesTotal?: number;
+  sinServicio?: boolean;
+};
+
 interface ClientListProps {
-  initialClientes: ClienteListItem[];
+  initialClientes: ClienteComercial[];
   regiones: Array<{ id: string; nombre: string }>;
   onRefresh: () => void;
 }
 
-export function ClientList({
-  initialClientes,
-  regiones,
-  onRefresh,
-}: ClientListProps) {
+type TabClientes = "activos" | "sin_servicio" | "inactivos";
+
+export function ClientList({ initialClientes, regiones, onRefresh }: ClientListProps) {
   const router = useRouter();
   const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCliente, setSelectedCliente] =
-    useState<ClienteListItem | null>(null);
+  const [selectedCliente, setSelectedCliente] = useState<ClienteListItem | null>(null);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
-  const [clienteToDelete, setClienteToDelete] =
-    useState<ClienteListItem | null>(null);
+  const [clienteToDelete, setClienteToDelete] = useState<ClienteListItem | null>(null);
   const [isGrupoFamiliarOpen, setIsGrupoFamiliarOpen] = useState(false);
-  const [clienteGrupoFamiliar, setClienteGrupoFamiliar] =
-    useState<ClienteListItem | null>(null);
-  const [activeTab, setActiveTab] = useState<"activos" | "inactivos">(
-    "activos",
-  );
+  const [clienteGrupoFamiliar, setClienteGrupoFamiliar] = useState<ClienteListItem | null>(null);
+  const [clienteToProspect, setClienteToProspect] = useState<ClienteComercial | null>(null);
+  const [isProspectDialogOpen, setIsProspectDialogOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<TabClientes>("activos");
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [isBulkActionDialogOpen, setIsBulkActionDialogOpen] = useState(false);
-  const [bulkAction, setBulkAction] = useState<
-    "activar" | "desactivar" | "eliminar" | null
-  >(null);
+  const [bulkAction, setBulkAction] = useState<"activar" | "desactivar" | "eliminar" | null>(null);
 
   const clientesActivos = initialClientes.filter((c) => c.activo);
+  const clientesSinServicio = initialClientes.filter((c) => c.activo && c.sinServicio);
   const clientesInactivos = initialClientes.filter((c) => !c.activo);
 
-  const currentClientes =
-    activeTab === "activos" ? clientesActivos : clientesInactivos;
+  const currentClientes = activeTab === "activos"
+    ? clientesActivos
+    : activeTab === "sin_servicio"
+      ? clientesSinServicio
+      : clientesInactivos;
 
-  const filteredClientes = currentClientes.filter(
-    (cliente) =>
-      cliente.nombreCompleto
-        .toLowerCase()
-        .includes(searchQuery.toLowerCase()) ||
-      cliente.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      cliente.telefonoCelular
-        ?.toLowerCase()
-        .includes(searchQuery.toLowerCase()),
+  const filteredClientes = currentClientes.filter((cliente) =>
+    cliente.nombreCompleto.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    cliente.email?.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    cliente.telefonoCelular?.toLowerCase().includes(searchQuery.toLowerCase()),
   );
 
   const selectedClienteIds = Object.keys(rowSelection)
@@ -86,293 +75,131 @@ export function ClientList({
     .map((index) => filteredClientes[Number.parseInt(index)]?.id)
     .filter(Boolean);
 
-  const handleView = (cliente: ClienteListItem) => {
-    router.push(`/clients/${cliente.id}`);
-  };
-
-  const handleEdit = (cliente: ClienteListItem) => {
-    setSelectedCliente(cliente);
-    setIsFormOpen(true);
-  };
-
-  const handleDelete = (cliente: ClienteListItem) => {
-    setClienteToDelete(cliente);
-    setIsDeleteDialogOpen(true);
-  };
+  const handleView = (cliente: ClienteListItem) => router.push(`/clients/${cliente.id}`);
+  const handleEdit = (cliente: ClienteListItem) => { setSelectedCliente(cliente); setIsFormOpen(true); };
+  const handleDelete = (cliente: ClienteListItem) => { setClienteToDelete(cliente); setIsDeleteDialogOpen(true); };
+  const handleGrupoFamiliar = (cliente: ClienteListItem) => { setClienteGrupoFamiliar(cliente); setIsGrupoFamiliarOpen(true); };
+  const handleSendProspecto = (cliente: ClienteComercial) => { setClienteToProspect(cliente); setIsProspectDialogOpen(true); };
 
   const handleToggle = async (cliente: ClienteListItem) => {
     const result = await toggleClienteActivo(cliente.id);
     if (result.success) {
-      toast.success(
-        `Cliente ${cliente.activo ? "desactivado" : "activado"} correctamente`,
-      );
+      toast.success(`Cliente ${cliente.activo ? "desactivado" : "activado"} correctamente`);
       onRefresh();
-    } else {
-      toast.error(result.error || "Error al cambiar estado del cliente");
-    }
+    } else toast.error(result.error || "Error al cambiar estado del cliente");
   };
 
-  const handleGrupoFamiliar = (cliente: ClienteListItem) => {
-    setClienteGrupoFamiliar(cliente);
-    setIsGrupoFamiliarOpen(true);
+  const confirmSendProspecto = async () => {
+    if (!clienteToProspect) return;
+    const result = await convertirClienteSinServicioAProspecto(clienteToProspect.id);
+    if (!result.success || !result.data) {
+      toast.error(result.error || "No se pudo enviar el cliente a Prospectos");
+      return;
+    }
+    toast.success("Cliente enviado a Prospectos correctamente");
+    setIsProspectDialogOpen(false);
+    setClienteToProspect(null);
+    onRefresh();
+    router.push(`/prospectos/${result.data.id}`);
   };
 
   const confirmDelete = async () => {
     if (!clienteToDelete) return;
     const result = await eliminarCliente(clienteToDelete.id);
-    if (result.success) {
-      toast.success("Cliente eliminado correctamente");
-      onRefresh();
-    } else {
-      toast.error(result.error || "Error al eliminar cliente");
-    }
-    setIsDeleteDialogOpen(false);
-    setClienteToDelete(null);
+    if (result.success) { toast.success("Cliente eliminado correctamente"); onRefresh(); }
+    else toast.error(result.error || "Error al eliminar cliente");
+    setIsDeleteDialogOpen(false); setClienteToDelete(null);
   };
 
-  const handleFormClose = () => {
-    setIsFormOpen(false);
-    setSelectedCliente(null);
-  };
+  const handleFormClose = () => { setIsFormOpen(false); setSelectedCliente(null); };
 
   const handleBulkAction = (action: "activar" | "desactivar" | "eliminar") => {
-    if (selectedClienteIds.length === 0) {
-      toast.error("Selecciona al menos un cliente");
-      return;
-    }
-    setBulkAction(action);
-    setIsBulkActionDialogOpen(true);
+    if (selectedClienteIds.length === 0) return toast.error("Selecciona al menos un cliente");
+    setBulkAction(action); setIsBulkActionDialogOpen(true);
   };
 
   const confirmBulkAction = async () => {
     if (!bulkAction || selectedClienteIds.length === 0) return;
-
     try {
       if (bulkAction === "eliminar") {
         const result = await eliminarClientesEnLote(selectedClienteIds);
-        if (result.success) {
-          toast.success(
-            `${result.data.eliminados} cliente(s) eliminado(s) correctamente`,
-          );
-          setRowSelection({});
-          onRefresh();
-        } else {
-          toast.error(result.error || "Error al eliminar clientes");
-        }
+        if (result.success) { toast.success(`${result.data.eliminados} cliente(s) eliminado(s) correctamente`); setRowSelection({}); onRefresh(); }
+        else toast.error(result.error || "Error al eliminar clientes");
       } else {
         const nuevoEstado = bulkAction === "activar";
-        const result = await toggleClientesActivoEnLote(
-          selectedClienteIds,
-          nuevoEstado,
-        );
-        if (result.success) {
-          toast.success(
-            `${result.data.actualizados} cliente(s) ${nuevoEstado ? "activado(s)" : "desactivado(s)"} correctamente`,
-          );
-          setRowSelection({});
-          onRefresh();
-        } else {
-          toast.error(result.error || "Error al actualizar clientes");
-        }
+        const result = await toggleClientesActivoEnLote(selectedClienteIds, nuevoEstado);
+        if (result.success) { toast.success(`${result.data.actualizados} cliente(s) ${nuevoEstado ? "activado(s)" : "desactivado(s)"} correctamente`); setRowSelection({}); onRefresh(); }
+        else toast.error(result.error || "Error al actualizar clientes");
       }
     } catch (error) {
-      console.error("Error en acción en lote:", error);
-      toast.error("Error al procesar la acción");
-    } finally {
-      setIsBulkActionDialogOpen(false);
-      setBulkAction(null);
-    }
+      console.error("Error en acción en lote:", error); toast.error("Error al procesar la acción");
+    } finally { setIsBulkActionDialogOpen(false); setBulkAction(null); }
   };
 
   const getBulkActionMessage = () => {
-    if (!bulkAction) return "";
     const count = selectedClienteIds.length;
-    switch (bulkAction) {
-      case "activar":
-        return `¿Estás seguro de que deseas activar ${count} cliente(s)?`;
-      case "desactivar":
-        return `¿Estás seguro de que deseas desactivar ${count} cliente(s)?`;
-      case "eliminar":
-        return `¿Estás seguro de que deseas eliminar ${count} cliente(s)? Esta acción no se puede deshacer.`;
-      default:
-        return "";
-    }
+    if (bulkAction === "activar") return `¿Estás seguro de que deseas activar ${count} cliente(s)?`;
+    if (bulkAction === "desactivar") return `¿Estás seguro de que deseas desactivar ${count} cliente(s)?`;
+    if (bulkAction === "eliminar") return `¿Estás seguro de que deseas eliminar ${count} cliente(s)? Esta acción no se puede deshacer.`;
+    return "";
   };
 
-  const columns = createClientColumns(
-    handleView,
-    handleEdit,
-    handleDelete,
-    handleToggle,
-    handleGrupoFamiliar,
-  );
+  const columns = createClientColumns(handleView, handleEdit, handleDelete, handleToggle, handleGrupoFamiliar, handleSendProspecto);
 
   return (
     <>
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between">
-            <CardTitle>Lista de Clientes</CardTitle>
-            <Button onClick={() => setIsFormOpen(true)}>
-              <Plus className="mr-2 h-4 w-4" />
-              Nuevo cliente
-            </Button>
+            <div>
+              <CardTitle>Lista de Clientes</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">“Sin servicio” identifica personas registradas que todavía pueden volver al flujo comercial de Prospectos.</p>
+            </div>
+            <Button onClick={() => setIsFormOpen(true)}><Plus className="mr-2 h-4 w-4" />Nuevo cliente</Button>
           </div>
         </CardHeader>
         <CardContent>
           <div className="mb-4 space-y-4">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                placeholder="Buscar por nombre, email o teléfono..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
+              <Input placeholder="Buscar por nombre, email o teléfono..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
             </div>
 
             {selectedClienteIds.length > 0 && (
               <div className="flex items-center justify-between rounded-lg border bg-muted p-4">
-                <div className="flex items-center gap-2">
-                  <CheckSquare className="h-5 w-5 text-primary" />
-                  <span className="font-medium">
-                    {selectedClienteIds.length} cliente(s) seleccionado(s)
-                  </span>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setRowSelection({})}
-                  >
-                    <X className="mr-1 h-4 w-4" />
-                    Limpiar
-                  </Button>
-                </div>
+                <div className="flex items-center gap-2"><CheckSquare className="h-5 w-5 text-primary" /><span className="font-medium">{selectedClienteIds.length} cliente(s) seleccionado(s)</span><Button variant="ghost" size="sm" onClick={() => setRowSelection({})}><X className="mr-1 h-4 w-4" />Limpiar</Button></div>
                 <div className="flex gap-2">
-                  {activeTab === "activos" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleBulkAction("desactivar")}
-                    >
-                      <PowerOff className="mr-2 h-4 w-4" />
-                      Desactivar
-                    </Button>
-                  )}
-                  {activeTab === "inactivos" && (
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => handleBulkAction("activar")}
-                    >
-                      <Power className="mr-2 h-4 w-4" />
-                      Activar
-                    </Button>
-                  )}
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleBulkAction("eliminar")}
-                    className="text-destructive hover:text-destructive"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />
-                    Eliminar
-                  </Button>
+                  {activeTab !== "inactivos" && <Button variant="outline" size="sm" onClick={() => handleBulkAction("desactivar")}><PowerOff className="mr-2 h-4 w-4" />Desactivar</Button>}
+                  {activeTab === "inactivos" && <Button variant="outline" size="sm" onClick={() => handleBulkAction("activar")}><Power className="mr-2 h-4 w-4" />Activar</Button>}
+                  <Button variant="outline" size="sm" onClick={() => handleBulkAction("eliminar")} className="text-destructive hover:text-destructive"><Trash2 className="mr-2 h-4 w-4" />Eliminar</Button>
                 </div>
               </div>
             )}
           </div>
 
-          <Tabs
-            value={activeTab}
-            onValueChange={(v) => {
-              setActiveTab(v as "activos" | "inactivos");
-              setRowSelection({});
-            }}
-          >
-            <TabsList className="grid w-full max-w-md grid-cols-2">
-              <TabsTrigger value="activos" className="relative">
-                Activos
-                <Badge variant="secondary" className="ml-2">
-                  {clientesActivos.length}
-                </Badge>
-              </TabsTrigger>
-              <TabsTrigger value="inactivos" className="relative">
-                Inactivos
-                <Badge variant="secondary" className="ml-2">
-                  {clientesInactivos.length}
-                </Badge>
-              </TabsTrigger>
+          <Tabs value={activeTab} onValueChange={(v) => { setActiveTab(v as TabClientes); setRowSelection({}); }}>
+            <TabsList className="grid w-full max-w-2xl grid-cols-3">
+              <TabsTrigger value="activos">Activos <Badge variant="secondary" className="ml-2">{clientesActivos.length}</Badge></TabsTrigger>
+              <TabsTrigger value="sin_servicio">Sin servicio <Badge variant="secondary" className="ml-2">{clientesSinServicio.length}</Badge></TabsTrigger>
+              <TabsTrigger value="inactivos">Inactivos <Badge variant="secondary" className="ml-2">{clientesInactivos.length}</Badge></TabsTrigger>
             </TabsList>
 
-            <TabsContent value="activos" className="mt-4">
-              <DataTable
-                columns={columns}
-                data={filteredClientes}
-                onRowSelectionChange={setRowSelection}
-                rowSelection={rowSelection}
-              />
-            </TabsContent>
-
-            <TabsContent value="inactivos" className="mt-4">
-              <DataTable
-                columns={columns}
-                data={filteredClientes}
-                onRowSelectionChange={setRowSelection}
-                rowSelection={rowSelection}
-              />
-            </TabsContent>
+            <TabsContent value="activos" className="mt-4"><DataTable columns={columns} data={filteredClientes} onRowSelectionChange={setRowSelection} rowSelection={rowSelection} /></TabsContent>
+            <TabsContent value="sin_servicio" className="mt-4"><DataTable columns={columns} data={filteredClientes} onRowSelectionChange={setRowSelection} rowSelection={rowSelection} /></TabsContent>
+            <TabsContent value="inactivos" className="mt-4"><DataTable columns={columns} data={filteredClientes} onRowSelectionChange={setRowSelection} rowSelection={rowSelection} /></TabsContent>
           </Tabs>
         </CardContent>
       </Card>
 
-      <ClientFormDrawer
-        open={isFormOpen}
-        onOpenChange={handleFormClose}
-        cliente={selectedCliente}
-        regiones={regiones}
-        onSuccess={() => {
-          onRefresh();
-          handleFormClose();
-        }}
-      />
+      <ClientFormDrawer open={isFormOpen} onOpenChange={handleFormClose} cliente={selectedCliente} regiones={regiones} onSuccess={() => { onRefresh(); handleFormClose(); }} />
 
-      {clienteGrupoFamiliar && (
-        <GrupoFamiliarDrawer
-          open={isGrupoFamiliarOpen}
-          onOpenChange={(open) => {
-            setIsGrupoFamiliarOpen(open);
-            if (!open) setClienteGrupoFamiliar(null);
-          }}
-          cliente={clienteGrupoFamiliar}
-          onSuccess={onRefresh}
-        />
-      )}
+      {clienteGrupoFamiliar && <GrupoFamiliarDrawer open={isGrupoFamiliarOpen} onOpenChange={(open) => { setIsGrupoFamiliarOpen(open); if (!open) setClienteGrupoFamiliar(null); }} cliente={clienteGrupoFamiliar} onSuccess={onRefresh} />}
 
-      <ConfirmationDialog
-        open={isDeleteDialogOpen}
-        onOpenChange={setIsDeleteDialogOpen}
-        onConfirm={confirmDelete}
-        title="¿Eliminar cliente?"
-        description={`¿Estás seguro de que deseas eliminar al cliente ${clienteToDelete?.nombreCompleto}? Esta acción no se puede deshacer.`}
-        confirmText="Eliminar"
-        variant="destructive"
-      />
+      <ConfirmationDialog open={isProspectDialogOpen} onOpenChange={setIsProspectDialogOpen} onConfirm={confirmSendProspecto} title="¿Enviar a Prospectos?" description={`${clienteToProspect?.nombreCompleto ?? "Este cliente"} no tiene servicios ni trámites registrados. Se desactivará de Clientes activos y se abrirá como Prospecto para seguimiento comercial. Su registro de cliente no se eliminará.`} confirmText="Enviar a Prospectos" variant="default" />
 
-      <ConfirmationDialog
-        open={isBulkActionDialogOpen}
-        onOpenChange={setIsBulkActionDialogOpen}
-        onConfirm={confirmBulkAction}
-        title={`${bulkAction === "eliminar" ? "Eliminar" : bulkAction === "activar" ? "Activar" : "Desactivar"} clientes`}
-        description={getBulkActionMessage()}
-        confirmText={
-          bulkAction === "eliminar"
-            ? "Eliminar"
-            : bulkAction === "activar"
-              ? "Activar"
-              : "Desactivar"
-        }
-        variant={bulkAction === "eliminar" ? "destructive" : "default"}
-      />
+      <ConfirmationDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen} onConfirm={confirmDelete} title="¿Eliminar cliente?" description={`¿Estás seguro de que deseas eliminar al cliente ${clienteToDelete?.nombreCompleto}? Esta acción no se puede deshacer.`} confirmText="Eliminar" variant="destructive" />
+
+      <ConfirmationDialog open={isBulkActionDialogOpen} onOpenChange={setIsBulkActionDialogOpen} onConfirm={confirmBulkAction} title={`${bulkAction === "eliminar" ? "Eliminar" : bulkAction === "activar" ? "Activar" : "Desactivar"} clientes`} description={getBulkActionMessage()} confirmText={bulkAction === "eliminar" ? "Eliminar" : bulkAction === "activar" ? "Activar" : "Desactivar"} variant={bulkAction === "eliminar" ? "destructive" : "default"} />
     </>
   );
 }
