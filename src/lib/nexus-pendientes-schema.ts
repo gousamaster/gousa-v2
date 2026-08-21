@@ -14,6 +14,11 @@ export async function ensureNexusPendientesSchema() {
       "detalle" TEXT,
       "categoria" TEXT NOT NULL DEFAULT 'OTRO',
       "fechaObjetivo" TIMESTAMP(3) NOT NULL,
+      "horaInicio" TEXT,
+      "horaFin" TEXT,
+      "enviarCorreoEquipo" BOOLEAN NOT NULL DEFAULT FALSE,
+      "correoEstado" TEXT,
+      "correoEnviadoAt" TIMESTAMP(3),
       "prospectoId" TEXT REFERENCES "prospecto"("id") ON DELETE CASCADE ON UPDATE CASCADE,
       "clienteId" TEXT REFERENCES "cliente"("id") ON DELETE CASCADE ON UPDATE CASCADE,
       "asignadoAId" TEXT REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE,
@@ -24,6 +29,11 @@ export async function ensureNexusPendientesSchema() {
       "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
       "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
     )`);
+    await db.$executeRawUnsafe(`ALTER TABLE "nexus_pendiente" ADD COLUMN IF NOT EXISTS "horaInicio" TEXT`);
+    await db.$executeRawUnsafe(`ALTER TABLE "nexus_pendiente" ADD COLUMN IF NOT EXISTS "horaFin" TEXT`);
+    await db.$executeRawUnsafe(`ALTER TABLE "nexus_pendiente" ADD COLUMN IF NOT EXISTS "enviarCorreoEquipo" BOOLEAN NOT NULL DEFAULT FALSE`);
+    await db.$executeRawUnsafe(`ALTER TABLE "nexus_pendiente" ADD COLUMN IF NOT EXISTS "correoEstado" TEXT`);
+    await db.$executeRawUnsafe(`ALTER TABLE "nexus_pendiente" ADD COLUMN IF NOT EXISTS "correoEnviadoAt" TIMESTAMP(3)`);
     await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "nexus_pendiente_fecha_idx" ON "nexus_pendiente"("fechaObjetivo")`);
     await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "nexus_pendiente_completado_idx" ON "nexus_pendiente"("completado")`);
     schemaReady = true;
