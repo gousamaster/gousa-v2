@@ -1,11 +1,10 @@
-// src/components/system/clientes/client-table-columns.tsx
-
 "use client";
 
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
 import {
+  ArrowRightLeft,
   Download,
   Eye,
   MoreHorizontal,
@@ -31,13 +30,20 @@ import { obtenerDatosClienteParaPdf } from "@/lib/actions/clientes/descarga-pdf-
 import { descargarFichaClientePdf } from "@/lib/pdf/ficha-cliente-pdf";
 import type { ClienteListItem } from "@/types/cliente-types";
 
+type ClienteComercial = ClienteListItem & {
+  sinServicio?: boolean;
+  serviciosContratados?: number;
+  tramitesTotal?: number;
+};
+
 interface ClientActionsProps {
-  cliente: ClienteListItem;
+  cliente: ClienteComercial;
   onView: (cliente: ClienteListItem) => void;
   onEdit: (cliente: ClienteListItem) => void;
   onDelete: (cliente: ClienteListItem) => void;
   onToggle: (cliente: ClienteListItem) => void;
   onGrupoFamiliar: (cliente: ClienteListItem) => void;
+  onSendProspecto: (cliente: ClienteComercial) => void;
 }
 
 function ClientActions({
@@ -47,6 +53,7 @@ function ClientActions({
   onDelete,
   onToggle,
   onGrupoFamiliar,
+  onSendProspecto,
 }: ClientActionsProps) {
   const [isDownloading, setIsDownloading] = useState(false);
 
@@ -91,22 +98,25 @@ function ClientActions({
           <Users className="mr-2 h-4 w-4" />
           Grupo familiar
         </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={handleDescargarFicha}
-          disabled={isDownloading}
-        >
+        <DropdownMenuItem onClick={handleDescargarFicha} disabled={isDownloading}>
           <Download className="mr-2 h-4 w-4" />
           {isDownloading ? "Generando PDF..." : "Descargar ficha"}
         </DropdownMenuItem>
+        {cliente.activo && cliente.sinServicio && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onSendProspecto(cliente)}>
+              <ArrowRightLeft className="mr-2 h-4 w-4" />
+              Enviar a Prospectos
+            </DropdownMenuItem>
+          </>
+        )}
         <DropdownMenuItem onClick={() => onToggle(cliente)}>
           <Power className="mr-2 h-4 w-4" />
           {cliente.activo ? "Desactivar" : "Activar"}
         </DropdownMenuItem>
         <DropdownMenuSeparator />
-        <DropdownMenuItem
-          onClick={() => onDelete(cliente)}
-          className="text-destructive focus:text-destructive"
-        >
+        <DropdownMenuItem onClick={() => onDelete(cliente)} className="text-destructive focus:text-destructive">
           <Trash2 className="mr-2 h-4 w-4" />
           Eliminar
         </DropdownMenuItem>
@@ -121,15 +131,13 @@ export const createClientColumns = (
   onDelete: (cliente: ClienteListItem) => void,
   onToggle: (cliente: ClienteListItem) => void,
   onGrupoFamiliar: (cliente: ClienteListItem) => void,
-): ColumnDef<ClienteListItem>[] => [
+  onSendProspecto: (cliente: ClienteComercial) => void,
+): ColumnDef<ClienteComercial>[] => [
   {
     id: "select",
     header: ({ table }) => (
       <Checkbox
-        checked={
-          table.getIsAllPageRowsSelected() ||
-          (table.getIsSomePageRowsSelected() && "indeterminate")
-        }
+        checked={table.getIsAllPageRowsSelected() || (table.getIsSomePageRowsSelected() && "indeterminate")}
         onCheckedChange={(value) => table.toggleAllPageRowsSelected(!!value)}
         aria-label="Seleccionar todos"
       />
@@ -147,70 +155,52 @@ export const createClientColumns = (
   {
     accessorKey: "nombreCompleto",
     header: "Nombre Completo",
-    cell: ({ row }) => (
-      <span className="font-medium">{row.original.nombreCompleto}</span>
-    ),
+    cell: ({ row }) => <span className="font-medium">{row.original.nombreCompleto}</span>,
   },
   {
     accessorKey: "tipoCliente",
     header: "Tipo",
     cell: ({ row }) => {
       const tipo = row.original.tipoCliente;
-      return (
-        <Badge variant={tipo === "ADULTO" ? "default" : "secondary"}>
-          {tipo === "ADULTO" ? "Adulto" : "Infante"}
-        </Badge>
-      );
+      return <Badge variant={tipo === "ADULTO" ? "default" : "secondary"}>{tipo === "ADULTO" ? "Adulto" : "Infante"}</Badge>;
     },
   },
   {
     accessorKey: "email",
     header: "Email",
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">
-        {row.original.email || "-"}
-      </span>
-    ),
+    cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.email || "-"}</span>,
   },
   {
     accessorKey: "telefonoCelular",
     header: "Teléfono",
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">
-        {row.original.telefonoCelular || "-"}
-      </span>
-    ),
+    cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.telefonoCelular || "-"}</span>,
   },
   {
     accessorKey: "regionNombre",
     header: "Región",
-    cell: ({ row }) => (
-      <span className="text-sm">{row.original.regionNombre}</span>
-    ),
+    cell: ({ row }) => <span className="text-sm">{row.original.regionNombre}</span>,
   },
   {
     accessorKey: "registradoPorNombre",
     header: "Registrado por",
-    cell: ({ row }) => (
-      <span className="text-sm text-muted-foreground">
-        {row.original.registradoPorNombre}
-      </span>
-    ),
+    cell: ({ row }) => <span className="text-sm text-muted-foreground">{row.original.registradoPorNombre}</span>,
+  },
+  {
+    id: "situacionComercial",
+    header: "Situación comercial",
+    cell: ({ row }) => row.original.sinServicio
+      ? <Badge variant="outline">Sin servicio</Badge>
+      : <Badge variant="secondary">Con servicio</Badge>,
   },
   {
     accessorKey: "createdAt",
     header: "Fecha de registro",
     cell: ({ row }) => {
       const date = row.original.createdAt;
-      if (!date)
-        return <span className="text-sm text-muted-foreground">-</span>;
+      if (!date) return <span className="text-sm text-muted-foreground">-</span>;
       try {
         const dateObj = typeof date === "string" ? new Date(date) : date;
-        return (
-          <span className="text-sm text-muted-foreground">
-            {format(dateObj, "dd MMM yyyy", { locale: es })}
-          </span>
-        );
+        return <span className="text-sm text-muted-foreground">{format(dateObj, "dd MMM yyyy", { locale: es })}</span>;
       } catch {
         return <span className="text-sm text-muted-foreground">-</span>;
       }
@@ -219,14 +209,7 @@ export const createClientColumns = (
   {
     accessorKey: "activo",
     header: "Estado",
-    cell: ({ row }) => {
-      const activo = row.original.activo;
-      return (
-        <Badge variant={activo ? "default" : "secondary"}>
-          {activo ? "Activo" : "Inactivo"}
-        </Badge>
-      );
-    },
+    cell: ({ row }) => <Badge variant={row.original.activo ? "default" : "secondary"}>{row.original.activo ? "Activo" : "Inactivo"}</Badge>,
   },
   {
     id: "actions",
@@ -238,6 +221,7 @@ export const createClientColumns = (
         onDelete={onDelete}
         onToggle={onToggle}
         onGrupoFamiliar={onGrupoFamiliar}
+        onSendProspecto={onSendProspecto}
       />
     ),
   },
