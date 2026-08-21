@@ -1,6 +1,6 @@
 import { db } from "@/lib/db";
 
-const ROLES_TOTALES = new Set(["ADMIN", "SUPER_ADMIN"]);
+const ROLES_TOTALES = new Set(["ADMIN", "SUPER_ADMIN", "MANAGER"]);
 
 export async function alcanceProspectos(userId: string) {
   const user = await db.user.findUnique({
@@ -10,14 +10,6 @@ export async function alcanceProspectos(userId: string) {
 
   if (!user) return { accesoTotal: false, userIds: [] as string[] };
   if (ROLES_TOTALES.has(user.role)) return { accesoTotal: true, userIds: [user.id] };
-
-  if (user.role === "MANAGER") {
-    const subordinados = await db.user.findMany({
-      where: { managerId: user.id, status: "ACTIVE", banned: { not: true } },
-      select: { id: true },
-    });
-    return { accesoTotal: false, userIds: [user.id, ...subordinados.map((u) => u.id)] };
-  }
 
   return { accesoTotal: false, userIds: [user.id] };
 }
