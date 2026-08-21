@@ -39,9 +39,28 @@ export async function DashboardProspectosEquipo() {
         COUNT(DISTINCT p."id") AS "prospectos",
         COUNT(DISTINCT p."id") FILTER (WHERE p."convertido"=true) AS "convertidos",
         COUNT(DISTINCT p."id") FILTER (WHERE p."convertido"=false AND p."estado"<>'PERDIDO') AS "activos",
-        COUNT(DISTINCT p."id") FILTER (WHERE p."convertido"=false AND p."scorePreliminar">=75) AS "altaPrioridad",
-        COUNT(DISTINCT s."id") FILTER (WHERE s."estado"='PENDIENTE') AS "pendientes",
-        COUNT(DISTINCT s."id") FILTER (WHERE s."estado"='PENDIENTE' AND s."programado_at"<CURRENT_TIMESTAMP) AS "vencidos",
+        COUNT(DISTINCT p."id") FILTER (WHERE p."convertido"=false AND p."estado"<>'PERDIDO' AND p."scorePreliminar">=75) AS "altaPrioridad",
+        COUNT(DISTINCT s."id") FILTER (
+          WHERE s."estado"='PENDIENTE'
+          AND EXISTS (
+            SELECT 1 FROM "prospecto" ps
+            WHERE ps."id"=s."prospecto_id"
+              AND ps."deletedAt" IS NULL
+              AND ps."convertido"=false
+              AND ps."estado"<>'PERDIDO'
+          )
+        ) AS "pendientes",
+        COUNT(DISTINCT s."id") FILTER (
+          WHERE s."estado"='PENDIENTE'
+          AND s."programado_at"<CURRENT_TIMESTAMP
+          AND EXISTS (
+            SELECT 1 FROM "prospecto" ps
+            WHERE ps."id"=s."prospecto_id"
+              AND ps."deletedAt" IS NULL
+              AND ps."convertido"=false
+              AND ps."estado"<>'PERDIDO'
+          )
+        ) AS "vencidos",
         COUNT(DISTINCT s."id") FILTER (WHERE s."estado"='COMPLETADO') AS "completados"
       FROM "user" u
       LEFT JOIN "prospecto" p
@@ -60,7 +79,7 @@ export async function DashboardProspectosEquipo() {
         (SELECT COUNT(*) FROM "prospecto" p WHERE p."deletedAt" IS NULL AND p."convertido"=true) AS "convertidos",
         (SELECT COUNT(*) FROM "prospecto_seguimiento" s INNER JOIN "prospecto" p ON p."id"=s."prospecto_id" WHERE p."deletedAt" IS NULL) AS "seguimientos",
         (SELECT COUNT(*) FROM "prospecto_seguimiento" s INNER JOIN "prospecto" p ON p."id"=s."prospecto_id" WHERE p."deletedAt" IS NULL AND s."estado"='COMPLETADO') AS "completados",
-        (SELECT COUNT(*) FROM "prospecto_seguimiento" s INNER JOIN "prospecto" p ON p."id"=s."prospecto_id" WHERE p."deletedAt" IS NULL AND s."estado"='PENDIENTE' AND s."programado_at"<CURRENT_TIMESTAMP) AS "vencidos"
+        (SELECT COUNT(*) FROM "prospecto_seguimiento" s INNER JOIN "prospecto" p ON p."id"=s."prospecto_id" WHERE p."deletedAt" IS NULL AND p."convertido"=false AND p."estado"<>'PERDIDO' AND s."estado"='PENDIENTE' AND s."programado_at"<CURRENT_TIMESTAMP) AS "vencidos"
     `,
   ]);
 
@@ -77,16 +96,14 @@ export async function DashboardProspectosEquipo() {
     ["Prospectos gestionados", gestionados, "Cartera comercial acumulada", UsersRound],
     ["Conversiones", convertidos, `${tasaConversion}% de conversión`, Target],
     ["Seguimientos completados", completados, `${cumplimiento}% del total registrado`, CheckCircle2],
-    ["Seguimientos vencidos", vencidos, vencidos > 0 ? "Requieren acción del equipo" : "Equipo al día", AlertTriangle],
+    ["Seguimientos vencidos", vencidos, vencidos > 0 ? "Activos que requieren acción" : "Equipo al día", AlertTriangle],
   ] as const;
 
   return (
     <section className="space-y-4 px-8 pt-6">
       <div>
         <h2 className="text-lg font-semibold">Gestión comercial por responsable</h2>
-        <p className="text-sm text-muted-foreground">
-          Conversión, cartera y disciplina de seguimiento para dirección.
-        </p>
+        <p className="text-sm text-muted-foreground">Conversión, cartera y disciplina de seguimiento para dirección.</p>
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -107,9 +124,7 @@ export async function DashboardProspectosEquipo() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Productividad comercial del equipo</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            La cartera se atribuye al Responsable Comercial formal; los seguimientos, al usuario asignado a cada acción.
-          </p>
+          <p className="text-sm text-muted-foreground">La cartera se atribuye al Responsable Comercial formal; pendientes y vencidos solo consideran prospectos activos.</p>
         </CardHeader>
         <CardContent>
           {equipo.length === 0 ? (
@@ -155,7 +170,7 @@ export async function DashboardProspectosEquipo() {
           )}
           <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
             <Clock3 className="h-3.5 w-3.5" />
-            Los vencidos se calculan en tiempo real contra la próxima acción pendiente registrada.
+            Los vencidos se calculan en tiempo real únicamente sobre oportunidades que siguen activas.
           </div>
         </CardContent>
       </Card>
