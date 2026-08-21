@@ -127,7 +127,7 @@ export async function convertirProspectoAClienteCompleto(
       });
 
       await tx.$executeRaw`UPDATE "prospecto" SET "primer_contacto_at"=COALESCE("primer_contacto_at",CURRENT_TIMESTAMP) WHERE "id"=${prospectoId}`;
-      await tx.$executeRaw`UPDATE "prospecto_seguimiento" SET "estado"='CANCELADO', "completado_at"=CURRENT_TIMESTAMP, "notas_resultado"=COALESCE("notas_resultado",'') || CASE WHEN COALESCE("notas_resultado",'')='' THEN '' ELSE E'\n' END || 'Cancelado automáticamente: prospecto convertido en cliente.' WHERE "prospecto_id"=${prospectoId} AND "estado"='PENDIENTE'`;
+      await tx.$executeRaw`UPDATE "prospecto_seguimiento" SET "estado"='CANCELADO', "completado_at"=CURRENT_TIMESTAMP, "notas"=COALESCE("notas",'') || CASE WHEN COALESCE("notas",'')='' THEN '' ELSE E'\n' END || 'Cancelado automáticamente: prospecto convertido en cliente.' WHERE "prospecto_id"=${prospectoId} AND "estado"='PENDIENTE'`;
       await tx.$executeRaw`INSERT INTO "prospecto_historial" ("id","prospecto_id","estado_anterior","estado_nuevo","motivo_perdida","cambiado_por_id","created_at") VALUES (${randomUUID()},${prospectoId},${prospecto.estado},'CONVERTIDO',NULL,${session.user.id},CURRENT_TIMESTAMP)`;
       await registrarAuditoriaProspecto(tx, {
         prospectoId,
@@ -169,9 +169,6 @@ export async function convertirClienteSinServicioAProspecto(
       return { success: false, error: "Este cliente ya tiene servicio o trámite y no puede volver a Prospectos" };
     }
 
-    // Si este cliente nació de un Prospecto NEXUS, no debemos crear otro.
-    // Reactivamos exactamente el mismo registro para conservar Score, fuente,
-    // responsable comercial, seguimientos e historial de conversión.
     const prospectoOrigen = await db.prospecto.findFirst({
       where: { clienteId, deletedAt: null },
       select: { id: true, convertido: true, estado: true },
@@ -241,7 +238,6 @@ export async function convertirClienteSinServicioAProspecto(
       return { success: true, data: { id: prospectoId } };
     }
 
-    // Cliente histórico sin Prospecto de origen: aquí sí corresponde crear uno nuevo.
     const identidades = await db.prospecto.findMany({
       where: { deletedAt: null },
       select: { id: true, nombres: true, apellidos: true, telefono: true, email: true, convertido: true },
