@@ -169,12 +169,95 @@ export async function convertirClienteSinServicioAProspecto(
       return { success: false, error: "Este cliente ya tiene servicio o trámite y no puede volver a Prospectos" };
     }
 
+    // Si este cliente nació de un Prospecto NEXUS, no debemos crear otro.
+    // Reactivamos exactamente el mismo registro para conservar Score, fuente,
+    // responsable comercial, seguimientos e historial de conversión.
+    const prospectoOrigen = await db.prospecto.findFirst({
+      where: { clienteId, deletedAt: null },
+      select: { id: true, convertido: true, estado: true },
+    });
+
+    if (prospectoOrigen) {
+      const prospectoId = await db.$transaction(async (tx) => {
+        const bloqueado = await tx.$queryRaw<{
+          id: string;
+          estado: string;
+          convertido: boolean;
+          clienteId: string | null;
+        }[]>`
+          SELECT "id", "estado", "convertido", "clienteId"
+          FROM "prospecto"
+          WHERE "id"=${prospectoOrigen.id} AND "deletedAt" IS NULL
+          FOR UPDATE
+        `;
+        const actual = bloqueado[0];
+        if (!actual || actual.clienteId !== clienteId) throw new Error("VINCULO_PROSPECTO_INVALIDO");
+
+        const historialPrevio = await tx.$queryRaw<{ estadoAnterior: string | null }[]>`
+          SELECT "estado_anterior" AS "estadoAnterior"
+          FROM "prospecto_historial"
+          WHERE "prospecto_id"=${actual.id} AND "estado_nuevo"='CONVERTIDO'
+          ORDER BY "created_at" DESC
+          LIMIT 1
+        `;
+        const candidato = historialPrevio[0]?.estadoAnterior;
+        const etapasActivas = ["NUEVO", "CONTACTADO", "CALIFICADO", "SEGUIMIENTO"];
+        const estadoReactivado = candidato && etapasActivas.includes(candidato) ? candidato : "SEGUIMIENTO";
+
+        await tx.prospecto.update({
+          where: { id: actual.id },
+          data: {
+            convertido: false,
+            estado: estadoReactivado,
+            clienteId: null,
+            convertidoPorId: null,
+            convertidoAt: null,
+          },
+        });
+
+        await tx.cliente.update({ where: { id: clienteId }, data: { activo: false } });
+
+        await tx.$executeRaw`
+          INSERT INTO "prospecto_historial"
+            ("id","prospecto_id","estado_anterior","estado_nuevo","motivo_perdida","cambiado_por_id","created_at")
+          VALUES
+            (${randomUUID()},${actual.id},'CONVERTIDO',${estadoReactivado},NULL,${session.user.id},CURRENT_TIMESTAMP)
+        `;
+
+        await registrarAuditoriaProspecto(tx, {
+          prospectoId: actual.id,
+          usuarioId: session.user.id,
+          accion: "CLIENTE_RETORNADO_A_PROSPECTO",
+          detalle: {
+            clienteOrigenId: clienteId,
+            estadoReactivado,
+            reutilizoProspectoOriginal: true,
+          },
+        });
+
+        return actual.id;
+      });
+
+      return { success: true, data: { id: prospectoId } };
+    }
+
+    // Cliente histórico sin Prospecto de origen: aquí sí corresponde crear uno nuevo.
     const identidades = await db.prospecto.findMany({
       where: { deletedAt: null },
       select: { id: true, nombres: true, apellidos: true, telefono: true, email: true, convertido: true },
     });
-    const duplicado = detectarProspectoDuplicado(identidades, cliente.telefonoCelular ?? "", cliente.email, undefined);
-    if (duplicado) return { success: false, error: "Ya existe un prospecto con el teléfono o email de este cliente" };
+    const duplicado = detectarProspectoDuplicado(
+      identidades,
+      cliente.telefonoCelular ?? "",
+      cliente.email,
+      undefined,
+    );
+    if (duplicado) {
+      return {
+        success: false,
+        error: "Ya existe otro prospecto con el teléfono o email de este cliente. Revisa ese prospecto antes de continuar.",
+      };
+    }
 
     const prospectoId = await db.$transaction(async (tx) => {
       const prospecto = await tx.prospecto.create({
@@ -197,13 +280,21 @@ export async function convertirClienteSinServicioAProspecto(
         prospectoId: prospecto.id,
         usuarioId: session.user.id,
         accion: "CLIENTE_SIN_SERVICIO_A_PROSPECTO",
-        detalle: { clienteOrigenId: clienteId, responsableComercialId: cliente.registradoPorId },
+        detalle: {
+          clienteOrigenId: clienteId,
+          responsableComercialId: cliente.registradoPorId,
+          reutilizoProspectoOriginal: false,
+        },
       });
       return prospecto.id;
     });
 
     return { success: true, data: { id: prospectoId } };
   } catch (error) {
+    const message = error instanceof Error ? error.message : "";
+    if (message === "VINCULO_PROSPECTO_INVALIDO") {
+      return { success: false, error: "No se pudo validar el vínculo entre Cliente y Prospecto" };
+    }
     console.error("Error al convertir cliente sin servicio en prospecto:", error);
     return { success: false, error: "No se pudo enviar el cliente a Prospectos" };
   }
