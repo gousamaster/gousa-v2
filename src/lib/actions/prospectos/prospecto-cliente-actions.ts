@@ -7,10 +7,62 @@ import { db } from "@/lib/db";
 import { registrarAuditoriaProspecto } from "@/lib/prospectos/auditoria";
 import { detectarProspectoDuplicado } from "@/lib/prospectos/deduplicacion";
 import type { ActionResult } from "@/types/action-result-types";
+import type { ClienteListItem } from "@/types/cliente-types";
 import {
   createClienteCompletoSchema,
   type CreateClienteCompletoFormData,
 } from "@/validations/cliente-validations";
+
+export type ClienteGestionComercial = ClienteListItem & {
+  serviciosContratados: number;
+  tramitesTotal: number;
+  sinServicio: boolean;
+};
+
+export async function obtenerClientesParaGestionComercial(): Promise<ActionResult<ClienteGestionComercial[]>> {
+  try {
+    const clientes = await db.cliente.findMany({
+      where: { deletedAt: null },
+      select: {
+        id: true,
+        nombres: true,
+        apellidos: true,
+        tipoCliente: true,
+        email: true,
+        telefonoCelular: true,
+        activo: true,
+        createdAt: true,
+        region: { select: { nombre: true } },
+        registradoPor: { select: { name: true } },
+        _count: { select: { servicios: true, tramites: true } },
+      },
+      orderBy: { createdAt: "desc" },
+    });
+
+    return {
+      success: true,
+      data: clientes.map((cliente) => ({
+        id: cliente.id,
+        nombres: cliente.nombres,
+        apellidos: cliente.apellidos,
+        nombreCompleto: `${cliente.nombres} ${cliente.apellidos}`.trim(),
+        tipoCliente: cliente.tipoCliente,
+        email: cliente.email,
+        telefonoCelular: cliente.telefonoCelular,
+        regionNombre: cliente.region.nombre,
+        registradoPorNombre: cliente.registradoPor.name,
+        activo: cliente.activo,
+        createdAt: cliente.createdAt,
+        serviciosContratados: cliente._count.servicios,
+        tramitesTotal: cliente._count.tramites,
+        sinServicio: cliente._count.servicios === 0 && cliente._count.tramites === 0,
+      })),
+    };
+  } catch (error) {
+    console.error("Error al obtener estado comercial de clientes:", error);
+    return { success: false, error: "No se pudieron cargar los clientes" };
+  }
+}
 
 export async function convertirProspectoAClienteCompleto(
   prospectoId: string,
