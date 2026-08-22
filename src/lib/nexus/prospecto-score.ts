@@ -1,9 +1,10 @@
-export const PROSPECTO_SCORE_VERSION = "NEXUS-PROSPECTO-0.2";
+export const PROSPECTO_SCORE_VERSION = "NEXUS-SCORE-2.0-GOUSA-2027";
 
 export type ScoreOption = {
   value: string;
   label: string;
   factor: number;
+  puntos: number;
 };
 
 export type ScoreQuestion = {
@@ -32,237 +33,189 @@ export type ProspectoScoreAnalysis = {
 };
 
 /**
- * Score NEXUS interno para prospectos de visa temporal B1/B2.
+ * NEXUS Score 2.0 — Método GO USA 2027.
  *
- * No intenta predecir una decisión consular. La ponderación prioriza señales
- * operativas alineadas con propósito temporal, intención de salida, vínculos
- * fuera de EE.UU., capacidad de cubrir el viaje, elegibilidad para la categoría
- * y consistencia de la información.
+ * Los puntajes provienen del archivo operativo SIMULADOR-2027.xlsx entregado
+ * por GO USA. NEXUS los organiza en nueve bloques con máximo total de 100
+ * puntos y obliga a escoger una sola alternativa por bloque para evitar que
+ * opciones mutuamente excluyentes se sumen accidentalmente.
  *
- * No usa edad, sexo, raza, religión, discapacidad, estado civil u otras
- * características protegidas como criterios de puntuación.
+ * IMPORTANTE: este Score es exclusivamente un índice interno de oportunidad
+ * comercial y preparación del perfil. NO representa probabilidad de
+ * aprobación consular, no sustituye evaluación profesional y no garantiza
+ * ninguna decisión migratoria.
  */
+function opcion(value: string, label: string, puntos: number, peso: number): ScoreOption {
+  return { value, label, puntos, factor: puntos / peso };
+}
+
 export const PROSPECTO_SCORE_QUESTIONS: ScoreQuestion[] = [
   {
-    id: "proposito_categoria",
-    titulo: "Propósito del viaje y encaje con visa temporal",
-    ayuda:
-      "Evalúa si el motivo declarado es específico, temporal y compatible con una visita de negocios o turismo, sin asumir que eso garantiza elegibilidad.",
-    peso: 14,
-    opciones: [
-      { value: "claro_compatible", label: "Propósito claro, temporal y coherente con la categoría", factor: 1 },
-      { value: "claro_revisar", label: "Propósito entendible, pero requiere precisar actividades o categoría", factor: 0.6 },
-      { value: "ambiguo", label: "Propósito ambiguo o con actividades que deben revisarse antes de avanzar", factor: 0.15 },
-    ],
-  },
-  {
-    id: "plan_temporal",
-    titulo: "Plan, duración y lógica del viaje",
-    ayuda:
-      "Considera si duración, destino, actividades y fechas tentativas forman un plan temporal razonablemente coherente.",
-    peso: 8,
-    opciones: [
-      { value: "coherente", label: "Plan definido y coherente con el motivo", factor: 1 },
-      { value: "parcial", label: "Plan general definido, con detalles pendientes", factor: 0.6 },
-      { value: "inconsistente", label: "Duración o actividades todavía no son coherentes", factor: 0.15 },
-    ],
-  },
-  {
-    id: "vinculos_retorno",
-    titulo: "Vínculos y compromisos objetivos de retorno",
-    ayuda:
-      "Considera compromisos verificables fuera de EE.UU., como trabajo, negocio, estudios, vivienda, responsabilidades económicas o personales. No puntúa el tipo de familia ni el estado civil.",
-    peso: 20,
-    opciones: [
-      { value: "multiples", label: "Existen varios compromisos claros, actuales y verificables", factor: 1 },
-      { value: "uno_solido", label: "Existe al menos un compromiso importante y verificable", factor: 0.7 },
-      { value: "limitados", label: "Los compromisos existen, pero son débiles o poco documentados", factor: 0.35 },
-      { value: "sin_evidencia", label: "Todavía no se identifican compromisos objetivos verificables", factor: 0 },
-    ],
-  },
-  {
-    id: "continuidad_actividad",
-    titulo: "Continuidad laboral, empresarial o académica",
-    ayuda:
-      "Mide estabilidad y posibilidad de verificación de la actividad actual, sin asignar valor por profesión, cargo o nivel educativo.",
-    peso: 12,
-    opciones: [
-      { value: "estable", label: "Actividad estable y verificable por 12 meses o más", factor: 1 },
-      { value: "consolidando", label: "Actividad verificable entre 3 y 12 meses", factor: 0.7 },
-      { value: "reciente", label: "Actividad reciente o documentación aún incompleta", factor: 0.4 },
-      { value: "no_aplica_documentado", label: "No tiene actividad actual, pero la situación está claramente explicada y documentada", factor: 0.45 },
-      { value: "sin_datos", label: "No hay información suficiente para verificar la situación actual", factor: 0.1 },
-    ],
-  },
-  {
-    id: "capacidad_costos",
-    titulo: "Capacidad para cubrir los costos del viaje",
-    ayuda:
-      "Evalúa si el presupuesto del viaje puede explicarse y respaldarse, ya sea con recursos propios o con apoyo de un tercero claramente documentado.",
-    peso: 12,
-    opciones: [
-      { value: "propios_suficientes", label: "Recursos propios suficientes y coherentes con el viaje", factor: 1 },
-      { value: "tercero_documentado", label: "Parte o todo será cubierto por un tercero y el apoyo está claramente documentado", factor: 0.85 },
-      { value: "parcial", label: "Hay recursos, pero falta sustento o el presupuesto requiere ajuste", factor: 0.45 },
-      { value: "sin_respaldo", label: "Todavía no existe un respaldo económico identificable", factor: 0.05 },
-    ],
-  },
-  {
-    id: "consistencia_global",
-    titulo: "Consistencia entre historia, formulario y documentos",
-    ayuda:
-      "Compara lo declarado sobre viaje, actividad, recursos y antecedentes para identificar contradicciones materiales o vacíos que deben corregirse.",
-    peso: 12,
-    opciones: [
-      { value: "consistente", label: "La información es consistente y los respaldos principales coinciden", factor: 1 },
-      { value: "vacíos_menores", label: "Hay vacíos menores corregibles sin cambiar la historia principal", factor: 0.7 },
-      { value: "inconsistencias", label: "Hay inconsistencias relevantes que deben resolverse antes de avanzar", factor: 0.2 },
-    ],
-  },
-  {
-    id: "cumplimiento_migratorio",
-    titulo: "Antecedentes de cumplimiento migratorio",
-    ayuda:
-      "Revisa sobreestadías, trabajo no autorizado, remoción, fraude u otros antecedentes relevantes. No tener viajes previos no reduce el puntaje.",
+    id: "estado_civil",
+    titulo: "Estado civil declarado",
+    ayuda: "Bloque de referencia del Método GO USA 2027. Registrar la situación actual tal como fue informada por el prospecto.",
     peso: 10,
     opciones: [
-      { value: "sin_incidentes", label: "No se conocen incidentes migratorios relevantes", factor: 1 },
-      { value: "sin_historial", label: "No tiene historial migratorio previo que evaluar", factor: 1 },
-      { value: "incidente_resuelto", label: "Existe un antecedente, pero está identificado y requiere análisis específico", factor: 0.45 },
-      { value: "riesgo_legal", label: "Existe un posible impedimento o antecedente serio que requiere revisión profesional antes de continuar", factor: 0 },
+      opcion("soltero", "Soltero(a)", 4, 10),
+      opcion("casado", "Casado(a)", 10, 10),
+      opcion("divorciado", "Divorciado(a)", 6, 10),
+      opcion("conviviente", "Conviviente", 8, 10),
     ],
   },
   {
-    id: "rechazos_cambios",
-    titulo: "Rechazos previos y cambios de circunstancias",
-    ayuda:
-      "Un rechazo previo no descalifica automáticamente. Si existió uno, evalúa si se comprende la razón y si hay cambios relevantes o mejor evidencia desde entonces.",
+    id: "hijos",
+    titulo: "Situación de hijos",
+    ayuda: "Seleccionar la alternativa que mejor representa la situación familiar declarada.",
     peso: 5,
     opciones: [
-      { value: "sin_rechazo", label: "No registra rechazo previo conocido", factor: 1 },
-      { value: "rechazo_con_cambios", label: "Hubo rechazo previo y existen cambios o nueva evidencia relevante", factor: 0.8 },
-      { value: "rechazo_sin_cambios", label: "Hubo rechazo previo y las circunstancias relevantes siguen prácticamente iguales", factor: 0.35 },
-      { value: "motivo_desconocido", label: "Hubo rechazo, pero todavía no se conoce o entiende suficientemente el motivo", factor: 0.2 },
+      opcion("dependientes", "Con hijos dependientes", 5, 5),
+      opcion("independientes", "Con hijos independientes", 4, 5),
+      opcion("sin_hijos", "Sin hijos", 1, 5),
     ],
   },
   {
-    id: "preparacion_entrevista",
-    titulo: "Preparación para explicar el caso con claridad",
-    ayuda:
-      "Evalúa si el prospecto puede explicar de forma breve y consistente el propósito, duración, financiamiento y razones de retorno, sin memorizar respuestas artificiales.",
-    peso: 7,
+    id: "situacion_laboral",
+    titulo: "Situación laboral principal",
+    ayuda: "Seleccionar una sola alternativa principal para evitar sumar condiciones laborales incompatibles entre sí.",
+    peso: 15,
     opciones: [
-      { value: "preparado", label: "Responde con claridad, naturalidad y consistencia", factor: 1 },
-      { value: "requiere_practica", label: "La historia es consistente, pero necesita práctica y mejor estructura", factor: 0.65 },
-      { value: "confuso", label: "Las respuestas son confusas o cambian al repreguntar", factor: 0.2 },
+      opcion("dependiente_privada_5", "Dependiente empresa privada +5 años", 7, 15),
+      opcion("dependiente_publica_5", "Dependiente empresa pública +5 años", 15, 15),
+      opcion("dependiente_menos_2", "Dependiente menos de 2 años", 2, 15),
+      opcion("independiente_nit_menos_2", "Independiente con NIT menos de 2 años", 7, 15),
+      opcion("independiente_nit_5", "Independiente con NIT +5 años", 15, 15),
+      opcion("independiente_sin_respaldo", "Independiente sin respaldo", 2, 15),
+      opcion("sin_trabajo_renta", "Sin trabajo, con renta/propiedades", 12, 15),
+      opcion("sin_trabajo_patrocinante", "Sin trabajo, con patrocinante", 5, 15),
+      opcion("sin_trabajo_sin_patrocinante", "Sin trabajo y sin patrocinante", -10, 15),
+    ],
+  },
+  {
+    id: "antiguedad_laboral",
+    titulo: "Antigüedad / estabilidad laboral",
+    ayuda: "Aplicar a la actividad laboral, empresarial o económica principal cuando corresponda.",
+    peso: 15,
+    opciones: [
+      opcion("menos_1", "Menos de 1 año", 3, 15),
+      opcion("menos_2", "Estable menos de 2 años", 5, 15),
+      opcion("3_5", "Estable de 3 a 5 años", 8, 15),
+      opcion("5_10", "Estable de 5 a 10 años", 12, 15),
+      opcion("mas_10", "Estable más de 10 años", 15, 15),
+    ],
+  },
+  {
+    id: "ingresos",
+    titulo: "Percepción salarial / ingresos mensuales",
+    ayuda: "Usar el ingreso mensual principal declarado y respaldable del prospecto.",
+    peso: 15,
+    opciones: [
+      opcion("hasta_3300", "Bs 3.300 o menos", 2, 15),
+      opcion("3300_6000", "Bs 3.300 a Bs 6.000", 4, 15),
+      opcion("6000_9999", "Bs 6.000 a Bs 9.999", 9, 15),
+      opcion("10000_19999", "Bs 10.000 a Bs 19.999", 12, 15),
+      opcion("20000_mas", "Bs 20.000 o más", 15, 15),
+    ],
+  },
+  {
+    id: "vivienda",
+    titulo: "Vivienda / estabilidad residencial",
+    ayuda: "Seleccionar la condición residencial principal. Se corrigió la referencia cruzada de la fila Alquiler - Bs 2.500 del Excel original.",
+    peso: 10,
+    opciones: [
+      opcion("propiedad", "Propiedad inmueble a su nombre", 10, 10),
+      opcion("anticretico", "Anticrético", 5, 10),
+      opcion("alquiler_menor_2500", "Alquiler hasta Bs 2.500", 3, 10),
+      opcion("alquiler_3000_mas", "Alquiler Bs 3.000 o más", 4, 10),
+      opcion("vive_padres", "Vive con padres", 2, 10),
+    ],
+  },
+  {
+    id: "solidez_financiera",
+    titulo: "Principal señal patrimonial / financiera",
+    ayuda: "Elegir la señal que mejor represente la situación actual. El Excel permitía múltiples checks; Score 2.0 usa una sola opción para mantener el máximo del bloque en 10 puntos.",
+    peso: 10,
+    opciones: [
+      opcion("otro_patrimonio", "Otro patrimonio a su nombre", 7, 10),
+      opcion("cuentas_bancarias", "Cuentas bancarias con ahorro/movimiento", 10, 10),
+      opcion("efectivo_ahorrado", "Dinero en efectivo ahorrado", 6, 10),
+      opcion("deuda_alta_productiva", "Deuda bancaria alta vinculada a negocio/propiedad", 10, 10),
+      opcion("deuda_baja", "Deuda bancaria baja", 4, 10),
+      opcion("sin_deuda_sin_bienes", "Sin deuda pero sin bienes", -10, 10),
+    ],
+  },
+  {
+    id: "entorno_usa",
+    titulo: "Contexto de viaje / vínculos en Estados Unidos",
+    ayuda: "Registrar la situación que mejor describa el contexto principal del viaje; no equivale por sí sola a elegibilidad consular.",
+    peso: 10,
+    opciones: [
+      opcion("familiar_ciudadano", "Familiar de primer grado ciudadano estadounidense", 8, 10),
+      opcion("evento_feria", "Invitación a evento o feria en Estados Unidos", 10, 10),
+      opcion("amistad_legal", "Amistad o conocido en Estados Unidos con estatus legal", 6, 10),
+      opcion("sin_conocido_respaldo", "Sin conocido en Estados Unidos, pero con respaldos de viaje", 8, 10),
+      opcion("familiar_directo_irregular", "Familiar directo en Estados Unidos con situación migratoria irregular", -20, 10),
+    ],
+  },
+  {
+    id: "historial_viajes",
+    titulo: "Historial de viajes al exterior",
+    ayuda: "Seleccionar la alternativa que mejor resuma el historial internacional declarado.",
+    peso: 10,
+    opciones: [
+      opcion("mas_2_ultimos_5", "Más de 2 países visitados en los últimos 5 años", 10, 10),
+      opcion("2_ultimos_5", "2 países visitados en los últimos 5 años", 7, 10),
+      opcion("mas_5_historicos", "Más de 5 viajes al exterior realizados históricamente", 5, 10),
+      opcion("ninguno", "Ningún viaje al exterior", 1, 10),
     ],
   },
 ];
 
 export function calcularProspectoScore(respuestas: ProspectoScoreAnswers) {
   let score = 0;
-
   for (const pregunta of PROSPECTO_SCORE_QUESTIONS) {
     const respuesta = respuestas[pregunta.id];
-    const opcion = pregunta.opciones.find((item) => item.value === respuesta);
-
-    if (!opcion) {
-      throw new Error(`Respuesta inválida para ${pregunta.id}`);
-    }
-
-    score += pregunta.peso * opcion.factor;
+    const opcionSeleccionada = pregunta.opciones.find((item) => item.value === respuesta);
+    if (!opcionSeleccionada) throw new Error(`Respuesta inválida para ${pregunta.id}`);
+    score += opcionSeleccionada.puntos;
   }
-
   const resultado = Math.round(score);
-
-  return {
-    score: Math.max(0, Math.min(100, resultado)),
-    clasificacion: clasificarProspectoScore(resultado),
-  };
+  const scoreNormalizado = Math.max(0, Math.min(100, resultado));
+  return { score: scoreNormalizado, clasificacion: clasificarProspectoScore(scoreNormalizado) };
 }
 
-export function analizarProspectoScore(
-  respuestas: ProspectoScoreAnswers,
-): ProspectoScoreAnalysis {
+export function analizarProspectoScore(respuestas: ProspectoScoreAnswers): ProspectoScoreAnalysis {
   const items = PROSPECTO_SCORE_QUESTIONS.map((pregunta) => {
-    const opcion = pregunta.opciones.find(
-      (item) => item.value === respuestas[pregunta.id],
-    );
-
-    if (!opcion) {
-      throw new Error(`Respuesta inválida para ${pregunta.id}`);
-    }
-
-    return {
-      preguntaId: pregunta.id,
-      titulo: pregunta.titulo,
-      respuesta: opcion.label,
-      aporte: Math.round(pregunta.peso * opcion.factor * 10) / 10,
-      peso: pregunta.peso,
-      factor: opcion.factor,
-    };
+    const seleccion = pregunta.opciones.find((item) => item.value === respuestas[pregunta.id]);
+    if (!seleccion) throw new Error(`Respuesta inválida para ${pregunta.id}`);
+    return { preguntaId: pregunta.id, titulo: pregunta.titulo, respuesta: seleccion.label, aporte: seleccion.puntos, peso: pregunta.peso, factor: seleccion.factor };
   });
 
-  const fortalezas = items
-    .filter((item) => item.factor >= 0.8)
-    .sort((a, b) => b.peso - a.peso)
-    .slice(0, 4)
-    .map(({ factor: _factor, ...item }) => item);
+  const fortalezas = items.filter((item) => item.factor >= 0.75).sort((a, b) => b.aporte - a.aporte).slice(0, 4).map(({ factor: _factor, ...item }) => item);
+  const alertas = items.filter((item) => item.factor < 0.4).sort((a, b) => a.factor - b.factor || b.peso - a.peso).slice(0, 4).map(({ factor: _factor, ...item }) => item);
 
-  const alertas = items
-    .filter((item) => item.factor < 0.6)
-    .sort((a, b) => b.peso * (1 - b.factor) - a.peso * (1 - a.factor))
-    .slice(0, 4)
-    .map(({ factor: _factor, ...item }) => item);
-
-  const acciones = alertas.map((alerta) => {
-    const accionesPorPregunta: Record<string, string> = {
-      proposito_categoria:
-        "Precisar el motivo del viaje y confirmar que las actividades declaradas encajen con una visita temporal antes de avanzar.",
-      plan_temporal:
-        "Definir mejor duración, destinos, fechas tentativas y actividades para que el plan sea coherente con el propósito declarado.",
-      vinculos_retorno:
-        "Identificar y documentar compromisos objetivos de retorno que realmente existan y puedan verificarse.",
-      continuidad_actividad:
-        "Completar la evidencia de la actividad laboral, empresarial, académica o explicar claramente la situación actual.",
-      capacidad_costos:
-        "Alinear presupuesto, duración y fuente de fondos; reunir respaldo verificable propio o del tercero que financiará el viaje.",
-      consistencia_global:
-        "Resolver contradicciones entre historia, formulario y documentos antes de preparar una solicitud.",
-      cumplimiento_migratorio:
-        "Detener la preparación estándar y solicitar revisión especializada del antecedente migratorio antes de continuar.",
-      rechazos_cambios:
-        "Revisar el rechazo previo, entender qué circunstancias siguen iguales y qué evidencia nueva existe antes de una nueva solicitud.",
-      preparacion_entrevista:
-        "Practicar una explicación breve, natural y consistente del propósito, financiamiento, duración y razones de retorno.",
-    };
-
-    return accionesPorPregunta[alerta.preguntaId] ??
-      `Revisar y fortalecer: ${alerta.titulo}.`;
-  });
-
-  const { score } = calcularProspectoScore(respuestas);
-  const prioridadComercial: ProspectoScoreAnalysis["prioridadComercial"] =
-    score >= 75 ? "ALTA" : score >= 50 ? "MEDIA" : "BAJA";
-
-  return {
-    prioridadComercial,
-    fortalezas,
-    alertas,
-    acciones: [...new Set(acciones)].slice(0, 4),
+  const accionesPorPregunta: Record<string, string> = {
+    estado_civil: "Confirmar que la información familiar esté actualizada y sea consistente con la ficha del prospecto.",
+    hijos: "Completar correctamente el contexto familiar y responsabilidades declaradas.",
+    situacion_laboral: "Revisar la actividad económica actual y solicitar respaldo real cuando corresponda.",
+    antiguedad_laboral: "Validar fechas y continuidad de la actividad laboral o económica declarada.",
+    ingresos: "Confirmar ingreso mensual y evidencia disponible antes de avanzar con la evaluación comercial.",
+    vivienda: "Precisar la situación residencial y el respaldo que realmente exista.",
+    solidez_financiera: "Revisar la principal señal financiera/patrimonial y documentarla correctamente.",
+    entorno_usa: "Revisar el contexto de viaje y cualquier vínculo en Estados Unidos antes de definir el siguiente paso.",
+    historial_viajes: "Completar el historial internacional y registrar países/viajes de forma consistente.",
   };
+  const acciones = alertas.map((alerta) => accionesPorPregunta[alerta.preguntaId] ?? `Revisar: ${alerta.titulo}.`);
+  const { score } = calcularProspectoScore(respuestas);
+  const prioridadComercial: ProspectoScoreAnalysis["prioridadComercial"] = score >= 70 ? "ALTA" : score >= 45 ? "MEDIA" : "BAJA";
+  return { prioridadComercial, fortalezas, alertas, acciones: [...new Set(acciones)].slice(0, 4) };
 }
 
 export function clasificarProspectoScore(score: number) {
-  if (score >= 82) return "ALTO";
-  if (score >= 65) return "MEDIO_ALTO";
-  if (score >= 45) return "MEDIO";
-  return "BAJO";
+  if (score >= 70) return "ALTA_OPORTUNIDAD";
+  if (score >= 45) return "MEDIA_OPORTUNIDAD";
+  return "BAJA_OPORTUNIDAD";
 }
 
 export function validarRespuestasProspectoScore(respuestas: ProspectoScoreAnswers) {
-  return PROSPECTO_SCORE_QUESTIONS.every((pregunta) => {
-    const valor = respuestas[pregunta.id];
-    return pregunta.opciones.some((opcion) => opcion.value === valor);
-  });
+  return PROSPECTO_SCORE_QUESTIONS.every((pregunta) => pregunta.opciones.some((opcion) => opcion.value === respuestas[pregunta.id]));
 }
