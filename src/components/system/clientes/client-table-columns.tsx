@@ -78,13 +78,14 @@ function ClientActions({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="h-8 w-8 p-0">
-          <span className="sr-only">Abrir menú</span>
+        <Button variant="outline" size="sm" className="h-8 gap-1 px-2">
           <MoreHorizontal className="h-4 w-4" />
+          <span className="hidden xl:inline">Acciones</span>
+          <span className="sr-only">Abrir acciones del cliente</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        <DropdownMenuLabel>Acciones</DropdownMenuLabel>
+      <DropdownMenuContent align="start" className="min-w-52">
+        <DropdownMenuLabel>Acciones del cliente</DropdownMenuLabel>
         <DropdownMenuSeparator />
         <DropdownMenuItem onClick={() => onView(cliente)}>
           <Eye className="mr-2 h-4 w-4" />
@@ -92,7 +93,7 @@ function ClientActions({
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onEdit(cliente)}>
           <Pencil className="mr-2 h-4 w-4" />
-          Editar
+          Editar perfil
         </DropdownMenuItem>
         <DropdownMenuItem onClick={() => onGrupoFamiliar(cliente)}>
           <Users className="mr-2 h-4 w-4" />
@@ -147,6 +148,23 @@ export const createClientColumns = (
         checked={row.getIsSelected()}
         onCheckedChange={(value) => row.toggleSelected(!!value)}
         aria-label="Seleccionar fila"
+      />
+    ),
+    enableSorting: false,
+    enableHiding: false,
+  },
+  {
+    id: "actions",
+    header: "Acciones",
+    cell: ({ row }) => (
+      <ClientActions
+        cliente={row.original}
+        onView={onView}
+        onEdit={onEdit}
+        onDelete={onDelete}
+        onToggle={onToggle}
+        onGrupoFamiliar={onGrupoFamiliar}
+        onSendProspecto={onSendProspecto}
       />
     ),
     enableSorting: false,
@@ -210,19 +228,5 @@ export const createClientColumns = (
     accessorKey: "activo",
     header: "Estado",
     cell: ({ row }) => <Badge variant={row.original.activo ? "default" : "secondary"}>{row.original.activo ? "Activo" : "Inactivo"}</Badge>,
-  },
-  {
-    id: "actions",
-    cell: ({ row }) => (
-      <ClientActions
-        cliente={row.original}
-        onView={onView}
-        onEdit={onEdit}
-        onDelete={onDelete}
-        onToggle={onToggle}
-        onGrupoFamiliar={onGrupoFamiliar}
-        onSendProspecto={onSendProspecto}
-      />
-    ),
   },
 ];
