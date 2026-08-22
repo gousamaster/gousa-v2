@@ -18,13 +18,16 @@ export async function ensureVuelosSchema() {
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ADD COLUMN IF NOT EXISTS "fechaEmision" TIMESTAMP(3)`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ADD COLUMN IF NOT EXISTS "observacionPago" TEXT`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ADD COLUMN IF NOT EXISTS "cerradoPorId" TEXT`);
+  await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ADD COLUMN IF NOT EXISTS "emitidoPorId" TEXT`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ADD COLUMN IF NOT EXISTS "comisionVenta" NUMERIC(12,2) DEFAULT 0`);
   await db.$executeRawUnsafe(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='orden_cotizacion_vuelo_clienteId_fkey') THEN ALTER TABLE "orden_cotizacion_vuelo" ADD CONSTRAINT "orden_cotizacion_vuelo_clienteId_fkey" FOREIGN KEY ("clienteId") REFERENCES "cliente"("id") ON DELETE RESTRICT ON UPDATE CASCADE; END IF; END $$;`);
   await db.$executeRawUnsafe(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='orden_cotizacion_vuelo_cerradoPorId_fkey') THEN ALTER TABLE "orden_cotizacion_vuelo" ADD CONSTRAINT "orden_cotizacion_vuelo_cerradoPorId_fkey" FOREIGN KEY ("cerradoPorId") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;`);
+  await db.$executeRawUnsafe(`DO $$ BEGIN IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname='orden_cotizacion_vuelo_emitidoPorId_fkey') THEN ALTER TABLE "orden_cotizacion_vuelo" ADD CONSTRAINT "orden_cotizacion_vuelo_emitidoPorId_fkey" FOREIGN KEY ("emitidoPorId") REFERENCES "user"("id") ON DELETE SET NULL ON UPDATE CASCADE; END IF; END $$;`);
   await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_vuelo_prospectoId_idx" ON "orden_cotizacion_vuelo"("prospectoId")`);
   await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_vuelo_clienteId_idx" ON "orden_cotizacion_vuelo"("clienteId")`);
   await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_vuelo_estado_idx" ON "orden_cotizacion_vuelo"("estado")`);
   await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_vuelo_creadoPorId_idx" ON "orden_cotizacion_vuelo"("creadoPorId")`);
   await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_vuelo_cerradoPorId_idx" ON "orden_cotizacion_vuelo"("cerradoPorId")`);
+  await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_vuelo_emitidoPorId_idx" ON "orden_cotizacion_vuelo"("emitidoPorId")`);
   await db.$executeRawUnsafe(`CREATE INDEX IF NOT EXISTS "orden_cotizacion_vuelo_createdAt_idx" ON "orden_cotizacion_vuelo"("createdAt")`);
 }
