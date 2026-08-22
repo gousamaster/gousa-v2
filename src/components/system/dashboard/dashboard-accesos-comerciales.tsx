@@ -27,14 +27,14 @@ export function DashboardAccesosComerciales() {
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2"><ListChecks className="h-5 w-5 text-primary"/><CardTitle className="text-base">Gestiones NEXUS</CardTitle><Badge variant="secondary">{GESTIONES_NEXUS.length}</Badge></div>
-          <p className="text-sm text-muted-foreground">Catálogo operativo para clasificar correctamente cada gestión del cliente.</p>
+          <p className="text-sm text-muted-foreground">Selecciona una gestión, luego el cliente. NEXUS abrirá directamente Servicios y Trámites para registrar la contratación.</p>
         </CardHeader>
         <CardContent>
           <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-3">
             {GESTIONES_NEXUS.map((gestion, index) => (
-              <a key={gestion.id} href="/clients" className="flex items-center gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50">
-                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span>
-                <span className="text-sm font-medium leading-snug">{gestion.nombre}</span>
+              <a key={gestion.id} href={`/clients?gestion=${gestion.id}`} className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/50 hover:border-primary/40">
+                <span className="flex items-center gap-3"><span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-semibold text-primary">{index + 1}</span><span className="text-sm font-medium leading-snug">{gestion.nombre}</span></span>
+                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground" />
               </a>
             ))}
           </div>
