@@ -72,3 +72,6 @@ Crear opciones operativas visibles:
 - [x] Recuperación de Documentos esenciales en `reconcile/nexus-multiverso`.
 - [ ] Recuperación completa de UI + flujo de Centro de Visas.
 - [ ] QA de reconciliación antes de integrar a `nexus-dev`.
+
+## Checkpoint de despliegue
+- 21/08 21:30 Bolivia: reintento controlado para validar Punto 6 ampliado después del límite de Vercel.
