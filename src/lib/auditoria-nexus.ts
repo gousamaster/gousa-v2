@@ -1,3 +1,4 @@
+"use server";
 import{headers}from"next/headers";import{auth}from"@/lib/auth";import{db}from"@/lib/db";
 export type AuditoriaNexusItem={id:string;accion:string;entidad:string;entidadId:string|null;clienteId:string|null;detalle:string|null;usuarioNombre:string|null;createdAt:Date};
 async function ensure(){await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "auditoria_nexus" ("id" TEXT PRIMARY KEY,"accion" TEXT NOT NULL,"entidad" TEXT NOT NULL,"entidadId" TEXT,"clienteId" TEXT REFERENCES "cliente"("id") ON DELETE SET NULL,"detalle" TEXT,"usuarioId" TEXT REFERENCES "user"("id") ON DELETE SET NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);CREATE INDEX IF NOT EXISTS "auditoria_nexus_cliente_idx" ON "auditoria_nexus"("clienteId");CREATE INDEX IF NOT EXISTS "auditoria_nexus_created_idx" ON "auditoria_nexus"("createdAt");`)}
