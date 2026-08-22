@@ -102,12 +102,12 @@ function ClientActions({
           <Download className="mr-2 h-4 w-4" />
           {isDownloading ? "Generando PDF..." : "Descargar ficha"}
         </DropdownMenuItem>
-        {cliente.activo && cliente.sinServicio && (
+        {cliente.sinServicio && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onSendProspecto(cliente)}>
               <ArrowRightLeft className="mr-2 h-4 w-4" />
-              Enviar a Prospectos
+              Devolver a Prospectos
             </DropdownMenuItem>
           </>
         )}
