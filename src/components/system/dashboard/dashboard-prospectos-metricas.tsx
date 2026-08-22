@@ -1,116 +1,24 @@
 import Link from "next/link";
-import {
-  AlertTriangle,
-  CalendarClock,
-  CheckCircle2,
-  CircleDot,
-  Clock3,
-  Gauge,
-  ScanSearch,
-  Target,
-  UserRoundCheck,
-  UsersRound,
-} from "lucide-react";
+import { AlertTriangle, CalendarClock, CheckCircle2, CircleDot, Clock3, Gauge, ScanSearch, Target, UserRoundCheck, UsersRound } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { db } from "@/lib/db";
 import { etiquetaOrigenProspecto } from "@/lib/prospectos/origenes";
 
-type SeguimientoMetricasRow = { pendientes: bigint; vencidos: bigint; proximas24h: bigint };
-type EmbudoRow = { estado: string; total: bigint };
-type PerdidaRow = { motivo: string; total: bigint };
-type FuenteRow = { origen: string; total: bigint; convertidos: bigint };
-type RespuestaRow = { promedioMinutos: number | null; conContacto: bigint; sinContacto: bigint };
-type AtencionRow = {
-  id: string; nombres: string; apellidos: string | null; score: number | null;
-  accion: string | null; programadoAt: Date | null; vencido: boolean;
-};
-
-function numero(value: bigint | number | null | undefined) { return Number(value ?? 0); }
-function formatDate(value: Date | null) {
-  if (!value) return "Sin próxima acción";
-  return new Date(value).toLocaleString("es-BO", { dateStyle: "medium", timeStyle: "short" });
-}
-function formatTiempo(minutos: number | null | undefined) {
-  if (minutos == null || !Number.isFinite(Number(minutos))) return "—";
-  const value = Number(minutos);
-  if (value < 60) return `${Math.round(value)} min`;
-  const horas = Math.round((value / 60) * 10) / 10;
-  if (horas < 24) return `${horas} h`;
-  return `${Math.round((horas / 24) * 10) / 10} días`;
-}
-
-export async function DashboardProspectosMetricas() {
-  const base = { deletedAt: null } as const;
-  const activos = { ...base, convertido: false, estado: { not: "PERDIDO" } } as const;
-  const [total, nuevos, seguimiento, convertidos, evaluados, sinEvaluar, altaPrioridad, scoreAggregate,
-    seguimientoRows, altaSinSeguimientoRows, atencion, embudoRows, perdidosRows, motivosPerdida,
-    fuentesRows, respuestaRows] = await Promise.all([
-    db.prospecto.count({ where: base }),
-    db.prospecto.count({ where: { ...activos, estado: "NUEVO" } }),
-    db.prospecto.count({ where: { ...activos, estado: { in: ["CONTACTADO", "CALIFICADO", "SEGUIMIENTO"] } } }),
-    db.prospecto.count({ where: { ...base, convertido: true } }),
-    db.prospecto.count({ where: { ...activos, scorePreliminar: { not: null } } }),
-    db.prospecto.count({ where: { ...activos, scorePreliminar: null } }),
-    db.prospecto.count({ where: { ...activos, scorePreliminar: { gte: 75 } } }),
-    db.prospecto.aggregate({ where: { ...activos, scorePreliminar: { not: null } }, _avg: { scorePreliminar: true } }),
-    db.$queryRaw<SeguimientoMetricasRow[]>`SELECT COUNT(*) FILTER (WHERE s."estado"='PENDIENTE') AS "pendientes", COUNT(*) FILTER (WHERE s."estado"='PENDIENTE' AND s."programado_at"<CURRENT_TIMESTAMP) AS "vencidos", COUNT(*) FILTER (WHERE s."estado"='PENDIENTE' AND s."programado_at">=CURRENT_TIMESTAMP AND s."programado_at"<CURRENT_TIMESTAMP+INTERVAL '24 hours') AS "proximas24h" FROM "prospecto_seguimiento" s INNER JOIN "prospecto" p ON p."id"=s."prospecto_id" WHERE p."deletedAt" IS NULL AND p."convertido"=false AND p."estado"<>'PERDIDO'`,
-    db.$queryRaw<{ total: bigint }[]>`SELECT COUNT(*) AS "total" FROM "prospecto" p WHERE p."deletedAt" IS NULL AND p."convertido"=false AND p."estado"<>'PERDIDO' AND p."scorePreliminar">=75 AND NOT EXISTS (SELECT 1 FROM "prospecto_seguimiento" s WHERE s."prospecto_id"=p."id" AND s."estado"='PENDIENTE')`,
-    db.$queryRaw<AtencionRow[]>`SELECT p."id",p."nombres",p."apellidos",p."scorePreliminar" AS "score",prox."accion",prox."programadoAt",CASE WHEN prox."programadoAt" IS NOT NULL AND prox."programadoAt"<CURRENT_TIMESTAMP THEN true ELSE false END AS "vencido" FROM "prospecto" p LEFT JOIN LATERAL (SELECT s."accion",s."programado_at" AS "programadoAt" FROM "prospecto_seguimiento" s WHERE s."prospecto_id"=p."id" AND s."estado"='PENDIENTE' ORDER BY s."programado_at" ASC LIMIT 1) prox ON true WHERE p."deletedAt" IS NULL AND p."convertido"=false AND p."estado"<>'PERDIDO' AND ((prox."programadoAt" IS NOT NULL AND prox."programadoAt"<CURRENT_TIMESTAMP) OR p."scorePreliminar">=75) ORDER BY CASE WHEN prox."programadoAt" IS NOT NULL AND prox."programadoAt"<CURRENT_TIMESTAMP THEN 0 ELSE 1 END,p."scorePreliminar" DESC NULLS LAST,prox."programadoAt" ASC NULLS LAST LIMIT 6`,
-    db.$queryRaw<EmbudoRow[]>`SELECT "estado",COUNT(*) AS "total" FROM "prospecto" WHERE "deletedAt" IS NULL AND "convertido"=false GROUP BY "estado"`,
-    db.$queryRaw<{ total: bigint }[]>`SELECT COUNT(*) AS "total" FROM "prospecto" WHERE "deletedAt" IS NULL AND "convertido"=false AND "estado"='PERDIDO'`,
-    db.$queryRaw<PerdidaRow[]>`SELECT COALESCE(NULLIF(TRIM("motivo_perdida"),''),'Sin motivo') AS "motivo",COUNT(*) AS "total" FROM "prospecto" WHERE "deletedAt" IS NULL AND "convertido"=false AND "estado"='PERDIDO' GROUP BY 1 ORDER BY "total" DESC,"motivo" ASC LIMIT 5`,
-    db.$queryRaw<FuenteRow[]>`SELECT CASE WHEN UPPER(TRIM(COALESCE("origen",''))) IN ('META','FACEBOOK','INSTAGRAM') THEN 'META' WHEN TRIM(COALESCE("origen",''))='' THEN 'SIN_DEFINIR' ELSE UPPER(TRIM("origen")) END AS "origen", COUNT(*) AS "total", COUNT(*) FILTER (WHERE "convertido"=true) AS "convertidos" FROM "prospecto" WHERE "deletedAt" IS NULL GROUP BY 1 ORDER BY "total" DESC,"origen" ASC LIMIT 8`,
-    db.$queryRaw<RespuestaRow[]>`SELECT AVG(EXTRACT(EPOCH FROM ("primer_contacto_at"-"createdAt"))/60.0)::float8 AS "promedioMinutos", COUNT(*) FILTER (WHERE "primer_contacto_at" IS NOT NULL) AS "conContacto", COUNT(*) FILTER (WHERE "primer_contacto_at" IS NULL AND "convertido"=false AND "estado"<>'PERDIDO') AS "sinContacto" FROM "prospecto" WHERE "deletedAt" IS NULL`,
-  ]);
-
-  const tasaConversion = total > 0 ? Math.round((convertidos / total) * 100) : 0;
-  const scorePromedio = Math.round(scoreAggregate._avg.scorePreliminar ?? 0);
-  const pendientes = numero(seguimientoRows[0]?.pendientes);
-  const vencidos = numero(seguimientoRows[0]?.vencidos);
-  const proximas24h = numero(seguimientoRows[0]?.proximas24h);
-  const altaSinSeguimiento = numero(altaSinSeguimientoRows[0]?.total);
-  const perdidos = numero(perdidosRows[0]?.total);
-  const respuesta = respuestaRows[0];
-  const porEstado = Object.fromEntries(embudoRows.map((r) => [r.estado, numero(r.total)]));
-  const etapas = [
-    ["NUEVO", "Nuevos"], ["CONTACTADO", "Contactados"], ["CALIFICADO", "Calificados"],
-    ["SEGUIMIENTO", "En seguimiento"], ["CONVERTIDO", "Convertidos"], ["PERDIDO", "Perdidos"],
-  ] as const;
-
-  const metricas = [
-    ["Prospectos totales", total, "Registrados en el CRM", UsersRound],
-    ["Nuevos", nuevos, "Pendientes de primer contacto", CircleDot],
-    ["En gestión", seguimiento, "Contactados, calificados o en seguimiento", Target],
-    ["Convertidos", convertidos, `${tasaConversion}% de conversión acumulada`, CheckCircle2],
-    ["Score promedio", evaluados > 0 ? `${scorePromedio}%` : "—", `${evaluados} prospecto${evaluados === 1 ? "" : "s"} activo${evaluados === 1 ? "" : "s"} evaluado${evaluados === 1 ? "" : "s"}`, Gauge],
-    ["Prioridad alta", altaPrioridad, "Activos con Score NEXUS de 75% o más", Target],
-    ["Sin evaluar", sinEvaluar, "Prospectos activos sin Score NEXUS", ScanSearch],
-    ["Perdidos", perdidos, "Prospectos actualmente fuera del embudo activo", AlertTriangle],
-  ] as const;
-  const operativas = [
-    ["Seguimientos pendientes", pendientes, "Acciones abiertas en prospectos activos", CalendarClock],
-    ["Seguimientos vencidos", vencidos, vencidos > 0 ? "Requieren atención inmediata" : "Sin atrasos registrados", AlertTriangle],
-    ["Próximas 24 horas", proximas24h, "Contactos programados próximamente", Clock3],
-    ["Alta sin seguimiento", altaSinSeguimiento, "Activos Score ≥75 sin próxima acción pendiente", UserRoundCheck],
-  ] as const;
-
-  return <section className="space-y-6 px-8 pt-6">
-    <div><div className="mb-3"><h2 className="text-lg font-semibold">Pulso comercial de prospectos</h2><p className="text-sm text-muted-foreground">Estado del embudo, cobertura de evaluación y prioridad comercial NEXUS.</p></div>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metricas.map(([titulo,valor,detalle,Icono]) => <Card key={titulo}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{titulo}</CardTitle><Icono className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{valor}</div><p className="mt-1 text-xs text-muted-foreground">{detalle}</p></CardContent></Card>)}</div>
-    </div>
-
-    <Card><CardHeader><CardTitle className="text-base">Embudo comercial</CardTitle><p className="text-sm text-muted-foreground">Distribución actual por etapa. Los convertidos se cuentan aparte para no mezclarlos con prospectos activos.</p></CardHeader><CardContent className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{etapas.map(([estado,label]) => { const valor = estado === "CONVERTIDO" ? convertidos : (porEstado[estado] ?? 0); const pct = total > 0 ? Math.round((valor/total)*100) : 0; return <div key={estado} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{label}</p><p className="mt-1 text-2xl font-bold">{valor}</p><p className="text-xs text-muted-foreground">{pct}% del total</p></div>; })}</div>
-      <div><p className="mb-2 text-sm font-medium">Principales motivos de pérdida</p>{motivosPerdida.length === 0 ? <p className="text-sm text-muted-foreground">Todavía no hay prospectos perdidos.</p> : <div className="space-y-2">{motivosPerdida.map((item) => <div key={item.motivo} className="flex items-center justify-between rounded-md border px-3 py-2 text-sm"><span>{item.motivo}</span><span className="font-semibold">{numero(item.total)}</span></div>)}</div>}</div>
-    </CardContent></Card>
-
-    <Card><CardHeader><CardTitle className="text-base">Adquisición y velocidad de atención</CardTitle><p className="text-sm text-muted-foreground">De dónde llegan los prospectos y cuánto tarda el equipo en realizar el primer contacto efectivo.</p></CardHeader><CardContent className="space-y-5">
-      <div className="grid gap-3 sm:grid-cols-3"><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Tiempo medio al primer contacto</p><p className="mt-1 text-2xl font-bold">{formatTiempo(respuesta?.promedioMinutos)}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Con primer contacto registrado</p><p className="mt-1 text-2xl font-bold">{numero(respuesta?.conContacto)}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Activos sin primer contacto</p><p className="mt-1 text-2xl font-bold">{numero(respuesta?.sinContacto)}</p></div></div>
-      <div><p className="mb-2 text-sm font-medium">Fuentes de prospectos</p>{fuentesRows.length===0?<p className="text-sm text-muted-foreground">Todavía no hay fuentes registradas.</p>:<div className="space-y-2">{fuentesRows.map(item=>{const totalFuente=numero(item.total);const convertidosFuente=numero(item.convertidos);const conversion=totalFuente>0?Math.round((convertidosFuente/totalFuente)*100):0;return <div key={item.origen} className="flex flex-col gap-1 rounded-md border px-3 py-2 text-sm sm:flex-row sm:items-center sm:justify-between"><span>{item.origen==="SIN_DEFINIR"?"Sin definir":etiquetaOrigenProspecto(item.origen)}</span><span className="text-muted-foreground">{totalFuente} prospecto{totalFuente===1?"":"s"} · {convertidosFuente} convertido{convertidosFuente===1?"":"s"} · {conversion}% conversión</span></div>})}</div>}</div>
-    </CardContent></Card>
-
-    <div><div className="mb-3"><h2 className="text-lg font-semibold">Agenda comercial NEXUS</h2><p className="text-sm text-muted-foreground">Lo que el equipo debe atender para que ningún prospecto activo se enfríe.</p></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{operativas.map(([titulo,valor,detalle,Icono]) => <Card key={titulo}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{titulo}</CardTitle><Icono className="h-4 w-4 text-muted-foreground" /></CardHeader><CardContent><div className="text-2xl font-bold">{valor}</div><p className="mt-1 text-xs text-muted-foreground">{detalle}</p></CardContent></Card>)}</div></div>
-
-    <Card><CardHeader><CardTitle className="text-base">Atención prioritaria</CardTitle><p className="text-sm text-muted-foreground">Primero vencidos; después prospectos activos de prioridad alta que requieren gestión.</p></CardHeader><CardContent>{atencion.length === 0 ? <p className="text-sm text-muted-foreground">No hay prospectos urgentes en este momento.</p> : <div className="space-y-2">{atencion.map((item) => <Link key={item.id} href={`/prospectos/${item.id}`} className="flex flex-col gap-2 rounded-lg border p-3 transition-colors hover:bg-muted/50 md:flex-row md:items-center md:justify-between"><div><div className="flex flex-wrap items-center gap-2"><p className="font-medium">{item.nombres} {item.apellidos ?? ""}</p>{item.score !== null && <span className="rounded-full border px-2 py-0.5 text-xs">Score {item.score}%</span>}{item.vencido && <span className="text-xs font-medium text-destructive">VENCIDO</span>}</div><p className="mt-1 text-sm text-muted-foreground">{item.accion || "Prioridad alta sin seguimiento pendiente"}</p></div><span className="text-xs text-muted-foreground">{formatDate(item.programadoAt)}</span></Link>)}</div>}</CardContent></Card>
-  </section>;
-}
+type SeguimientoMetricasRow={pendientes:bigint;vencidos:bigint;proximas24h:bigint};type EmbudoRow={estado:string;total:bigint};type PerdidaRow={motivo:string;total:bigint};type FuenteRow={origen:string;total:bigint;convertidos:bigint};type RespuestaRow={promedioMinutos:number|null;conContacto:bigint;sinContacto:bigint};type AtencionRow={id:string;nombres:string;apellidos:string|null;score:number|null;accion:string|null;programadoAt:Date|null;vencido:boolean};type BandaRow={calientes:bigint;medios:bigint;frios:bigint};
+function numero(v:bigint|number|null|undefined){return Number(v??0)}function formatDate(v:Date|null){return v?new Date(v).toLocaleString("es-BO",{dateStyle:"medium",timeStyle:"short"}):"Sin próxima acción"}function formatTiempo(m:number|null|undefined){if(m==null||!Number.isFinite(Number(m)))return"—";const v=Number(m);if(v<60)return`${Math.round(v)} min`;const h=Math.round(v/6)/10;return h<24?`${h} h`:`${Math.round(h/2.4)/10} días`}
+function oportunidad(score:number|null){if(score==null)return"Sin evaluar";return score>=70?"CALIENTE · Alta oportunidad":score>=45?"MEDIO · Oportunidad media":"FRÍO · Baja oportunidad"}
+function accionScore(score:number|null,vencido:boolean,accion:string|null){if(vencido)return accion||"Atender seguimiento vencido hoy";if(score==null)return"Completar NEXUS Score 2.0";if(score>=70)return accion||"Contactar y buscar cierre / siguiente paso";if(score>=45)return accion||"Dar seguimiento y fortalecer objeciones";return accion||"Nutrir prospecto y reevaluar cuando cambie el perfil"}
+export async function DashboardProspectosMetricas(){const base={deletedAt:null}as const;const activos={...base,convertido:false,estado:{not:"PERDIDO"}}as const;const[total,nuevos,seguimiento,convertidos,evaluados,sinEvaluar,altaPrioridad,scoreAggregate,seguimientoRows,altaSinSeguimientoRows,atencion,embudoRows,perdidosRows,motivosPerdida,fuentesRows,respuestaRows,bandasRows]=await Promise.all([
+db.prospecto.count({where:base}),db.prospecto.count({where:{...activos,estado:"NUEVO"}}),db.prospecto.count({where:{...activos,estado:{in:["CONTACTADO","CALIFICADO","SEGUIMIENTO"]}}}),db.prospecto.count({where:{...base,convertido:true}}),db.prospecto.count({where:{...activos,scorePreliminar:{not:null}}}),db.prospecto.count({where:{...activos,scorePreliminar:null}}),db.prospecto.count({where:{...activos,scorePreliminar:{gte:70}}}),db.prospecto.aggregate({where:{...activos,scorePreliminar:{not:null}},_avg:{scorePreliminar:true}}),
+db.$queryRaw<SeguimientoMetricasRow[]>`SELECT COUNT(*) FILTER (WHERE s."estado"='PENDIENTE') AS "pendientes",COUNT(*) FILTER (WHERE s."estado"='PENDIENTE' AND s."programado_at"<CURRENT_TIMESTAMP) AS "vencidos",COUNT(*) FILTER (WHERE s."estado"='PENDIENTE' AND s."programado_at">=CURRENT_TIMESTAMP AND s."programado_at"<CURRENT_TIMESTAMP+INTERVAL '24 hours') AS "proximas24h" FROM "prospecto_seguimiento" s INNER JOIN "prospecto" p ON p."id"=s."prospecto_id" WHERE p."deletedAt" IS NULL AND p."convertido"=false AND p."estado"<>'PERDIDO'`,
+db.$queryRaw<{total:bigint}[]>`SELECT COUNT(*) AS "total" FROM "prospecto" p WHERE p."deletedAt" IS NULL AND p."convertido"=false AND p."estado"<>'PERDIDO' AND p."scorePreliminar">=70 AND NOT EXISTS(SELECT 1 FROM "prospecto_seguimiento" s WHERE s."prospecto_id"=p."id" AND s."estado"='PENDIENTE')`,
+db.$queryRaw<AtencionRow[]>`SELECT p."id",p."nombres",p."apellidos",p."scorePreliminar" AS "score",prox."accion",prox."programadoAt",CASE WHEN prox."programadoAt" IS NOT NULL AND prox."programadoAt"<CURRENT_TIMESTAMP THEN true ELSE false END AS "vencido" FROM "prospecto" p LEFT JOIN LATERAL(SELECT s."accion",s."programado_at" AS "programadoAt" FROM "prospecto_seguimiento" s WHERE s."prospecto_id"=p."id" AND s."estado"='PENDIENTE' ORDER BY s."programado_at" ASC LIMIT 1)prox ON true WHERE p."deletedAt" IS NULL AND p."convertido"=false AND p."estado"<>'PERDIDO' AND((prox."programadoAt" IS NOT NULL AND prox."programadoAt"<CURRENT_TIMESTAMP)OR p."scorePreliminar">=70) ORDER BY CASE WHEN prox."programadoAt" IS NOT NULL AND prox."programadoAt"<CURRENT_TIMESTAMP THEN 0 ELSE 1 END,p."scorePreliminar" DESC NULLS LAST,prox."programadoAt" ASC NULLS LAST LIMIT 8`,
+db.$queryRaw<EmbudoRow[]>`SELECT "estado",COUNT(*) AS "total" FROM "prospecto" WHERE "deletedAt" IS NULL AND "convertido"=false GROUP BY "estado"`,db.$queryRaw<{total:bigint}[]>`SELECT COUNT(*) AS "total" FROM "prospecto" WHERE "deletedAt" IS NULL AND "convertido"=false AND "estado"='PERDIDO'`,db.$queryRaw<PerdidaRow[]>`SELECT COALESCE(NULLIF(TRIM("motivo_perdida"),''),'Sin motivo') AS "motivo",COUNT(*) AS "total" FROM "prospecto" WHERE "deletedAt" IS NULL AND "convertido"=false AND "estado"='PERDIDO' GROUP BY 1 ORDER BY "total" DESC LIMIT 5`,db.$queryRaw<FuenteRow[]>`SELECT CASE WHEN UPPER(TRIM(COALESCE("origen",''))) IN('META','FACEBOOK','INSTAGRAM')THEN'META' WHEN TRIM(COALESCE("origen",''))='' THEN'SIN_DEFINIR' ELSE UPPER(TRIM("origen"))END AS "origen",COUNT(*) AS "total",COUNT(*) FILTER(WHERE "convertido"=true)AS "convertidos" FROM "prospecto" WHERE "deletedAt" IS NULL GROUP BY 1 ORDER BY "total" DESC LIMIT 8`,db.$queryRaw<RespuestaRow[]>`SELECT AVG(EXTRACT(EPOCH FROM("primer_contacto_at"-"createdAt"))/60.0)::float8 AS "promedioMinutos",COUNT(*) FILTER(WHERE "primer_contacto_at" IS NOT NULL)AS "conContacto",COUNT(*) FILTER(WHERE "primer_contacto_at" IS NULL AND "convertido"=false AND "estado"<>'PERDIDO')AS "sinContacto" FROM "prospecto" WHERE "deletedAt" IS NULL`,db.$queryRaw<BandaRow[]>`SELECT COUNT(*) FILTER(WHERE "scorePreliminar">=70)AS "calientes",COUNT(*) FILTER(WHERE "scorePreliminar">=45 AND "scorePreliminar"<70)AS "medios",COUNT(*) FILTER(WHERE "scorePreliminar"<45)AS "frios" FROM "prospecto" WHERE "deletedAt" IS NULL AND "convertido"=false AND "estado"<>'PERDIDO' AND "scorePreliminar" IS NOT NULL`]);
+const tasa=total>0?Math.round(convertidos/total*100):0,scoreProm=Math.round(scoreAggregate._avg.scorePreliminar??0),pend=numero(seguimientoRows[0]?.pendientes),venc=numero(seguimientoRows[0]?.vencidos),prox=numero(seguimientoRows[0]?.proximas24h),altaSin=numero(altaSinSeguimientoRows[0]?.total),perd=numero(perdidosRows[0]?.total),resp=respuestaRows[0],bandas=bandasRows[0],porEstado=Object.fromEntries(embudoRows.map(r=>[r.estado,numero(r.total)]));const etapas=[["NUEVO","Nuevos"],["CONTACTADO","Contactados"],["CALIFICADO","Calificados"],["SEGUIMIENTO","En seguimiento"],["CONVERTIDO","Convertidos"],["PERDIDO","Perdidos"]]as const;
+const metricas=[["Prospectos totales",total,"Registrados en CRM",UsersRound],["Nuevos",nuevos,"Pendientes de primer contacto",CircleDot],["En gestión",seguimiento,"Contactados, calificados o seguimiento",Target],["Convertidos",convertidos,`${tasa}% de conversión acumulada`,CheckCircle2],["Score promedio",evaluados?`${scoreProm}%`:"—",`${evaluados} activos evaluados`,Gauge],["Alta oportunidad",altaPrioridad,"Score NEXUS 2.0 ≥70",Target],["Sin evaluar",sinEvaluar,"Activos sin Score NEXUS 2.0",ScanSearch],["Perdidos",perd,"Fuera del embudo activo",AlertTriangle]]as const;const operativas=[["Seguimientos pendientes",pend,"Acciones abiertas",CalendarClock],["Seguimientos vencidos",venc,venc?"Atención inmediata":"Sin atrasos",AlertTriangle],["Próximas 24 horas",prox,"Contactos programados",Clock3],["Alta sin seguimiento",altaSin,"Score ≥70 sin próxima acción",UserRoundCheck]]as const;
+return <section className="space-y-6 px-8 pt-6"><div><div className="mb-3"><h2 className="text-lg font-semibold">Pulso comercial de prospectos</h2><p className="text-sm text-muted-foreground">NEXUS Score 2.0: oportunidad comercial, no probabilidad consular.</p></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{metricas.map(([t,v,d,I])=><Card key={t}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t}</CardTitle><I className="h-4 w-4 text-muted-foreground"/></CardHeader><CardContent><div className="text-2xl font-bold">{v}</div><p className="mt-1 text-xs text-muted-foreground">{d}</p></CardContent></Card>)}</div></div>
+<Card><CardHeader><CardTitle className="text-base">Temperatura comercial NEXUS</CardTitle><p className="text-sm text-muted-foreground">Clasificación práctica del Score 2.0 para priorizar el cierre.</p></CardHeader><CardContent><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-lg border p-4"><p className="text-sm font-medium">🔥 Calientes · Alta</p><p className="text-3xl font-bold">{numero(bandas?.calientes)}</p><p className="text-xs text-muted-foreground">70–100 · Contactar y buscar cierre</p></div><div className="rounded-lg border p-4"><p className="text-sm font-medium">Medios · Media</p><p className="text-3xl font-bold">{numero(bandas?.medios)}</p><p className="text-xs text-muted-foreground">45–69 · Seguimiento y objeciones</p></div><div className="rounded-lg border p-4"><p className="text-sm font-medium">Fríos · Baja</p><p className="text-3xl font-bold">{numero(bandas?.frios)}</p><p className="text-xs text-muted-foreground">0–44 · Nutrir y reevaluar</p></div></div></CardContent></Card>
+<Card><CardHeader><CardTitle className="text-base">Embudo comercial</CardTitle></CardHeader><CardContent className="space-y-5"><div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">{etapas.map(([e,l])=>{const v=e==="CONVERTIDO"?convertidos:(porEstado[e]??0),pct=total?Math.round(v/total*100):0;return <div key={e} className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">{l}</p><p className="mt-1 text-2xl font-bold">{v}</p><p className="text-xs text-muted-foreground">{pct}% del total</p></div>})}</div><div><p className="mb-2 text-sm font-medium">Principales motivos de pérdida</p>{motivosPerdida.length===0?<p className="text-sm text-muted-foreground">Todavía no hay prospectos perdidos.</p>:<div className="space-y-2">{motivosPerdida.map(i=><div key={i.motivo} className="flex justify-between rounded-md border px-3 py-2 text-sm"><span>{i.motivo}</span><b>{numero(i.total)}</b></div>)}</div>}</div></CardContent></Card>
+<Card><CardHeader><CardTitle className="text-base">Adquisición y velocidad de atención</CardTitle></CardHeader><CardContent className="space-y-5"><div className="grid gap-3 sm:grid-cols-3"><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Tiempo medio al primer contacto</p><p className="text-2xl font-bold">{formatTiempo(resp?.promedioMinutos)}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Con primer contacto</p><p className="text-2xl font-bold">{numero(resp?.conContacto)}</p></div><div className="rounded-lg border p-3"><p className="text-xs text-muted-foreground">Activos sin primer contacto</p><p className="text-2xl font-bold">{numero(resp?.sinContacto)}</p></div></div><div className="space-y-2">{fuentesRows.map(i=>{const t=numero(i.total),c=numero(i.convertidos);return <div key={i.origen} className="flex justify-between rounded-md border px-3 py-2 text-sm"><span>{i.origen==="SIN_DEFINIR"?"Sin definir":etiquetaOrigenProspecto(i.origen)}</span><span>{t} prospectos · {c} convertidos · {t?Math.round(c/t*100):0}%</span></div>})}</div></CardContent></Card>
+<div><div className="mb-3"><h2 className="text-lg font-semibold">Agenda comercial NEXUS</h2></div><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{operativas.map(([t,v,d,I])=><Card key={t}><CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2"><CardTitle className="text-sm font-medium">{t}</CardTitle><I className="h-4 w-4"/></CardHeader><CardContent><div className="text-2xl font-bold">{v}</div><p className="text-xs text-muted-foreground">{d}</p></CardContent></Card>)}</div></div>
+<Card><CardHeader><CardTitle className="text-base">Atención prioritaria y acción recomendada</CardTitle><p className="text-sm text-muted-foreground">Primero vencidos; luego prospectos calientes según Score 2.0.</p></CardHeader><CardContent>{atencion.length===0?<p className="text-sm text-muted-foreground">No hay prospectos urgentes.</p>:<div className="space-y-2">{atencion.map(i=><Link key={i.id} href={`/prospectos/${i.id}`} className="flex flex-col gap-2 rounded-lg border p-3 hover:bg-muted/50 md:flex-row md:items-center md:justify-between"><div><div className="flex flex-wrap gap-2"><p className="font-medium">{i.nombres} {i.apellidos??""}</p>{i.score!==null&&<span className="rounded-full border px-2 py-0.5 text-xs">Score {i.score}% · {oportunidad(i.score)}</span>}{i.vencido&&<span className="text-xs font-medium text-destructive">VENCIDO</span>}</div><p className="mt-1 text-sm font-medium">Acción: {accionScore(i.score,i.vencido,i.accion)}</p></div><span className="text-xs text-muted-foreground">{formatDate(i.programadoAt)}</span></Link>)}</div>}</CardContent></Card></section>}
