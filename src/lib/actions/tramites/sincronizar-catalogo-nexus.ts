@@ -22,6 +22,22 @@ export async function sincronizarCatalogoNexus(){
    else s=await db.catalogoServicio.create({data:{nombre:item.nombre,codigo:`NEXUS-${String(item.orden).padStart(2,"0")}`,activo:true,orden:item.orden,requiereTramite:item.orden<=14||[24,25,26,28].includes(item.orden)}});
    for(const r of regiones){const recargo=!/la\s*paz/i.test(r.nombre)&&item.recargoRegional?100:0;await db.servicioPrecioPorRegion.upsert({where:{servicioId_regionId:{servicioId:s.id,regionId:r.id}},create:{servicioId:s.id,regionId:r.id,precio:item.precio+recargo,activo:true},update:{precio:item.precio+recargo,activo:true}})}
  }
- await db.catalogoServicio.updateMany({where:{nombre:{contains:"FAMILIAR",mode:"insensitive"}},data:{activo:false}});
+ // Catálogo viejo: no debe convivir con las nuevas Solicitudes.
+ await db.catalogoServicio.updateMany({
+   where:{OR:[
+     {nombre:{contains:"Asesoria Nueva Visa B1/B2",mode:"insensitive"}},
+     {nombre:{contains:"Asesoría Nueva Visa B1/B2",mode:"insensitive"}},
+     {nombre:{contains:"Asesoria Nueva Visa F1",mode:"insensitive"}},
+     {nombre:{contains:"Asesoría Nueva Visa F1",mode:"insensitive"}},
+     {nombre:{contains:"Asesoria Renovacion Visa B1/B2",mode:"insensitive"}},
+     {nombre:{contains:"Asesoría Renovación Visa B1/B2",mode:"insensitive"}},
+     {nombre:{contains:"Asesoria Nueva Visa Categoria",mode:"insensitive"}},
+     {nombre:{contains:"Asesoría Nueva Visa Categoría",mode:"insensitive"}},
+     {nombre:{contains:"FAMILIAR",mode:"insensitive"}}
+   ]},
+   data:{activo:false}
+ });
+ // Reactiva explícitamente toda la matriz oficial por si algún nombre moderno coincidió con un filtro previo.
+ await db.catalogoServicio.updateMany({where:{nombre:{in:CATALOGO_SERVICIOS_NEXUS.map(x=>x.nombre)}},data:{activo:true}});
  return {success:true};
 }
