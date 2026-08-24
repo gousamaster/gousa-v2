@@ -5,11 +5,18 @@ import {CATALOGO_SERVICIOS_NEXUS} from "@/config/catalogo-servicios-nexus";
 const LEGACY=[
 "Asesoria Nueva Visa B1/B2 Cliente A -15anos","Asesoria Nueva Visa B1/B2 Cliente A +15anos","Asesoria Nueva Visa B1/B2 Cliente B -15anos","Asesoria Nueva Visa B1/B2 Cliente B +15anos","Asesoria Nueva Visa B1/B2 Cliente C -15anos","Asesoria Nueva Visa B1/B2 Cliente C +15anos","Asesoria Nueva Visa B1/B2 con PERDON MIGRATORIO","Asesoria Nueva Visa F1-J1 Cliente A","Asesoria Nueva Visa F1-J1 Cliente B","Asesoria Renovacion Visa B1/B2 por Courier","Asesoria Renovacion Visa B1/B2 con Entrevista","Asesoria Nueva Visa Categoria Otros/Especial",null,"Asesoria Migratoria y Evaluacion 30 Minutos","Asesoria Migratoria y Evaluacion 1 Hora","Asesoria Ultima Hora","Recuperacion de Cuenta e Impresion","Reprogramacion y Monitoreo de Cita","Recojo y despacho de Documento","Asesoria Renovacion Pasaporte Americano","Servicio de Asesoria Personalizada"] as const;
 
+function legacyPara(orden:number){
+ if(orden<=12)return LEGACY[orden-1];
+ if(orden===15||orden===16)return LEGACY[orden-2];
+ if(orden>=18&&orden<=23)return LEGACY[orden-3];
+ return null;
+}
+
 export async function sincronizarCatalogoNexus(){
  const regiones=await db.region.findMany({where:{activo:true}});
  const actuales=await db.catalogoServicio.findMany();
  for(const item of CATALOGO_SERVICIOS_NEXUS){
-   const legacy=item.orden<=12?LEGACY[item.orden-1]:item.orden>=15&&item.orden<=23?LEGACY[item.orden-2]:null;
+   const legacy=legacyPara(item.orden);
    let s=actuales.find(x=>x.nombre===item.nombre)||(legacy?actuales.find(x=>x.nombre===legacy):undefined);
    if(s)s=await db.catalogoServicio.update({where:{id:s.id},data:{nombre:item.nombre,activo:true,orden:item.orden,requiereTramite:item.orden<=14||[24,25,26,28].includes(item.orden)}});
    else s=await db.catalogoServicio.create({data:{nombre:item.nombre,codigo:`NEXUS-${String(item.orden).padStart(2,"0")}`,activo:true,orden:item.orden,requiereTramite:item.orden<=14||[24,25,26,28].includes(item.orden)}});
