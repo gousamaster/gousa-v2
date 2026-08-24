@@ -28,10 +28,11 @@ const data = {
     { title: "Citas", url: "/citas", icon: CalendarIcon },
     {
       title: "Servicios",
-      url: "/servicios/vuelos",
+      url: "/servicios",
       icon: PlaneIcon,
       isActive: true,
       items: [
+        { title: "Centro de Servicios", url: "/servicios" },
         { title: "✈ Vuelos", url: "/servicios/vuelos" },
         { title: "🏨 Hospedaje", url: "/servicios/hospedaje" },
         { title: "🚗 Rent a Car", url: "/servicios/rentacar" },
