@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { ArrowRight, BedDouble, Car, Plane, Ticket } from "lucide-react";
+import { ArrowRight, BedDouble, Car, Plane, ReceiptText, Ticket } from "lucide-react";
 import { auth } from "@/lib/auth";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -10,6 +10,7 @@ const servicios = [
   { titulo: "Hospedaje", etiqueta: "Estadía", descripcion: "Cotizaciones por destino, fechas, habitaciones, ocupación y despacho.", href: "/servicios/hospedaje", icon: BedDouble },
   { titulo: "Rent a Car", etiqueta: "Movilidad", descripcion: "Cotizaciones por recogida/entrega, vehículo, seguro, fechas y despacho.", href: "/servicios/rentacar", icon: Car },
   { titulo: "Atracciones", etiqueta: "Experiencias", descripcion: "Cotizaciones de parques y atracciones, pasajeros, fechas y despacho.", href: "/servicios/atracciones", icon: Ticket },
+  { titulo: "Venta Rápida", etiqueta: "Caja / Servicios", descripcion: "Servicios puntuales para personas sin crear Prospecto o Cliente, con responsable, cobro y trazabilidad.", href: "/servicios/venta-rapida", icon: ReceiptText },
 ] as const;
 
 export default async function ServiciosPage() {
@@ -25,11 +26,11 @@ export default async function ServiciosPage() {
             <h1 className="mt-3 text-2xl font-extrabold tracking-tight text-slate-950 sm:text-3xl">Centro de Servicios NEXUS</h1>
             <p className="mt-2 text-sm leading-6 text-slate-600 sm:text-base">Cotiza, consulta y da seguimiento a todos los servicios complementarios desde un mismo lugar, sin mezclar la información de cada módulo.</p>
           </div>
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">4 módulos disponibles</div>
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800">5 módulos disponibles</div>
         </div>
       </div>
 
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {servicios.map(({ titulo, etiqueta, descripcion, href, icon: Icon }) => (
           <Link key={href} href={href} className="group rounded-2xl focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2">
             <Card className="h-full border-slate-200/80 bg-white shadow-sm transition-all duration-200 group-hover:-translate-y-0.5 group-hover:border-blue-200 group-hover:shadow-md">
@@ -50,7 +51,7 @@ export default async function ServiciosPage() {
       </div>
 
       <div className="flex flex-col gap-2 rounded-2xl border border-dashed border-slate-300 bg-white/70 p-4 text-sm text-slate-600 sm:flex-row sm:items-center sm:justify-between">
-        <span>Cada módulo conserva sus órdenes, búsquedas, PDFs y estados de forma independiente.</span>
+        <span>Cada módulo conserva sus órdenes, búsquedas, PDFs, ventas y estados de forma independiente.</span>
         <span className="font-semibold text-slate-800">Centro operativo unificado</span>
       </div>
     </section>
