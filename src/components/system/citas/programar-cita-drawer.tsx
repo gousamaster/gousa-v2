@@ -1,5 +1,66 @@
 // src/components/system/citas/programar-cita-drawer.tsx
 "use client";
-import {zodResolver}from"@hookform/resolvers/zod";import{Loader2}from"lucide-react";import{useEffect,useMemo,useState}from"react";import{Controller,useForm}from"react-hook-form";import{toast}from"sonner";import{Button}from"@/components/ui/button";import{Checkbox}from"@/components/ui/checkbox";import{Input}from"@/components/ui/input";import{Label}from"@/components/ui/label";import{Select,SelectContent,SelectItem,SelectTrigger,SelectValue}from"@/components/ui/select";import{Sheet,SheetContent,SheetHeader,SheetTitle}from"@/components/ui/sheet";import{Textarea}from"@/components/ui/textarea";import{crearCita,obtenerTiposCitaConPrecio}from"@/lib/actions/citas/citas-actions";import{obtenerEstadosPago}from"@/lib/actions/tramites/servicios-actions";import{useSession}from"@/lib/auth-client";import{type CreateCitaFormData,createCitaSchema}from"@/validations/cita-validations";
-type TramiteParticipante={id:string;cliente:{nombres:string;apellidos:string};servicio:{nombre:string}};interface Props{open:boolean;onOpenChange:(open:boolean)=>void;tramiteId?:string;grupoFamiliarId?:string;regionId:string;tramitesDisponibles?:TramiteParticipante[];onSuccess:(citaId:string)=>void}
-export function ProgramarCitaDrawer({open,onOpenChange,tramiteId,grupoFamiliarId,regionId,tramitesDisponibles=[],onSuccess}:Props){const{data:session}=useSession();const[tiposCita,setTiposCita]=useState<Array<{id:string;nombre:string;precioRegion:number|null}>>([]);const[estadosPago,setEstadosPago]=useState<Array<{id:string;nombre:string;color:string|null}>>([]);const[isSubmitting,setIsSubmitting]=useState(false);const[cabina,setCabina]=useState(false);const[costoCabina,setCostoCabina]=useState(0);const otros=tramitesDisponibles.filter(t=>t.id!==tramiteId);const{register,control,handleSubmit,watch,setValue,reset,formState:{errors}}=useForm<CreateCitaFormData>({resolver:zodResolver(createCitaSchema),defaultValues:{tramiteId:tramiteId??null,grupoFamiliarId:grupoFamiliarId??null,precioAcordado:0,precioFinal:0,descuentoAplicado:null,participanteTramiteIds:[]}});const tipoId=watch("tipoCitaId"),precio=watch("precioAcordado"),descuento=watch("descuentoAplicado"),participantes=watch("participanteTramiteIds")??[],notas=watch("notas");const tipoSeleccionado=useMemo(()=>tiposCita.find(t=>t.id===tipoId),[tiposCita,tipoId]);const esSimulacro=(tipoSeleccionado?.nombre??"").toLowerCase().includes("simulacr");useEffect(()=>{if(!open)return;Promise.all([obtenerTiposCitaConPrecio(regionId),obtenerEstadosPago()]).then(([t,e])=>{if(t.success&&t.data)setTiposCita(t.data);if(e.success&&e.data)setEstadosPago(e.data)})},[open,regionId]);useEffect(()=>{if(tipoSeleccionado?.precioRegion!=null)setValue("precioAcordado",tipoSeleccionado.precioRegion);if(!esSimulacro){setCabina(false);setCostoCabina(0)}},[tipoId,tipoSeleccionado,esSimulacro,setValue]);useEffect(()=>{setValue("precioFinal",Math.max(0,(precio??0)+(cabina?costoCabina:0)-(descuento??0)))},[precio,descuento,cabina,costoCabina,setValue]);function toggle(id:string){setValue("participanteTramiteIds",participantes.includes(id)?participantes.filter(p=>p!==id):[...participantes,id])}function cerrar(v:boolean){if(!v){reset();setCabina(false);setCostoCabina(0)}onOpenChange(v)}const submit=handleSubmit(async data=>{if(!session?.user?.id)return;const payload={...data,precioFinal:Math.max(0,(data.precioAcordado??0)+(cabina?costoCabina:0)-(data.descuentoAplicado??0)),lugar:cabina?"Centro de Simulación Consular · Cabina":data.lugar,notas:cabina?`[UPGRADE CABINA +${costoCabina} Bs]${data.notas?` ${data.notas}`:""}`:data.notas};setIsSubmitting(true);const r=await crearCita(payload,session.user.id);setIsSubmitting(false);if(r.success&&r.data){toast.success(cabina?"Simulacro en cabina programado correctamente":"Cita programada correctamente");cerrar(false);onSuccess(r.data.id)}else toast.error(r.error??"Error al programar")});return <Sheet open={open} onOpenChange={cerrar}><SheetContent className="w-full sm:max-w-lg overflow-y-auto p-4"><SheetHeader><SheetTitle>{grupoFamiliarId?"Programar Cita Grupal":"Programar Cita"}</SheetTitle></SheetHeader><form onSubmit={submit} className="mt-6 space-y-5"><div className="space-y-2"><Label>Tipo de cita *</Label><Controller control={control} name="tipoCitaId" render={({field})=><Select value={field.value??""} onValueChange={field.onChange}><SelectTrigger><SelectValue placeholder="Selecciona tipo de cita"/></SelectTrigger><SelectContent>{tiposCita.map(t=><SelectItem key={t.id} value={t.id}>{t.nombre}{t.precioRegion!=null&&` — ${t.precioRegion.toLocaleString("es-BO")} Bs.`}</SelectItem>)}</SelectContent></Select>}/>{errors.tipoCitaId&&<p className="text-sm text-destructive">{errors.tipoCitaId.message}</p>}</div>{esSimulacro&&<div className="rounded-lg border border-primary/30 bg-primary/5 p-4 space-y-3"><label className="flex items-start gap-3 cursor-pointer"><Checkbox checked={cabina} onCheckedChange={v=>setCabina(v===true)}/><div><p className="font-semibold">Upgrade · Simulacro en Cabina</p><p className="text-xs text-muted-foreground">Centro de Simulación Consular. Servicio adicional al simulacro normal.</p></div></label>{cabina&&<div className="space-y-2"><Label>Costo adicional de cabina (Bs.)</Label><Input type="number" min="0" step="0.01" value={costoCabina} onChange={e=>setCostoCabina(Number(e.target.value)||0)}/><p className="text-xs text-muted-foreground">Se suma al precio del simulacro y queda registrado en la cita.</p></div>}</div>}<div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Fecha y hora *</Label><Input type="datetime-local" {...register("fechaHora")}/>{errors.fechaHora&&<p className="text-sm text-destructive">{errors.fechaHora.message}</p>}</div><div className="space-y-2"><Label>Lugar</Label><Input disabled={cabina} placeholder="Embajada, consulado..." value={cabina?"Centro de Simulación Consular · Cabina":undefined} {...(!cabina?register("lugar"): {})}/></div></div><div className="grid grid-cols-3 gap-3"><div><Label>Precio base *</Label><Input type="number" min="0" step="0.01" {...register("precioAcordado",{valueAsNumber:true})}/></div><div><Label>Descuento</Label><Input type="number" min="0" step="0.01" {...register("descuentoAplicado",{valueAsNumber:true,setValueAs:v=>v===""||isNaN(v)?null:Number(v)})}/></div><div><Label>Precio final</Label><Input type="number" readOnly className="bg-muted" {...register("precioFinal",{valueAsNumber:true})}/></div></div><div className="space-y-2"><Label>Estado de pago *</Label><Controller control={control} name="estadoPagoId" render={({field})=><Select value={field.value??""} onValueChange={field.onChange}><SelectTrigger><SelectValue placeholder="Selecciona estado de pago"/></SelectTrigger><SelectContent>{estadosPago.map(e=><SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}</SelectContent></Select>}/></div>{otros.length>0&&<div className="space-y-2"><Label>Participantes adicionales</Label>{otros.map(t=><label key={t.id} className="flex gap-3 border rounded p-2"><Checkbox checked={participantes.includes(t.id)} onCheckedChange={()=>toggle(t.id)}/><span>{t.cliente.nombres} {t.cliente.apellidos}</span></label>)}</div>}<div><Label>Notas</Label><Textarea rows={3} {...register("notas")}/></div><div className="flex gap-3"><Button type="button" variant="outline" className="flex-1" onClick={()=>cerrar(false)}>Cancelar</Button><Button type="submit" className="flex-1" disabled={isSubmitting}>{isSubmitting&&<Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Programar</Button></div></form></SheetContent></Sheet>}
+import {Loader2} from "lucide-react";
+import {useEffect,useMemo,useState} from "react";
+import {toast} from "sonner";
+import {Button} from "@/components/ui/button";
+import {Checkbox} from "@/components/ui/checkbox";
+import {Input} from "@/components/ui/input";
+import {Label} from "@/components/ui/label";
+import {Select,SelectContent,SelectItem,SelectTrigger,SelectValue} from "@/components/ui/select";
+import {Sheet,SheetContent,SheetHeader,SheetTitle} from "@/components/ui/sheet";
+import {Textarea} from "@/components/ui/textarea";
+import {obtenerTiposCita} from "@/lib/actions/citas/citas-actions";
+import {crearCitaIncluida} from "@/lib/actions/citas/cita-incluida-actions";
+import {useSession} from "@/lib/auth-client";
+
+type TramiteParticipante={id:string;cliente:{nombres:string;apellidos:string};servicio:{nombre:string}};
+interface Props{open:boolean;onOpenChange:(open:boolean)=>void;tramiteId?:string;grupoFamiliarId?:string;regionId:string;tramitesDisponibles?:TramiteParticipante[];onSuccess:(citaId:string)=>void}
+
+export function ProgramarCitaDrawer({open,onOpenChange,tramiteId,grupoFamiliarId,tramitesDisponibles=[],onSuccess}:Props){
+ const{data:session}=useSession();
+ const[tiposCita,setTiposCita]=useState<Array<{id:string;nombre:string;precioRegion:number|null}>>([]);
+ const[tipoId,setTipoId]=useState("");
+ const[fechaHora,setFechaHora]=useState("");
+ const[lugar,setLugar]=useState("");
+ const[notas,setNotas]=useState("");
+ const[participantes,setParticipantes]=useState<string[]>([]);
+ const[isSubmitting,setIsSubmitting]=useState(false);
+ const[cabina,setCabina]=useState(false);
+ const otros=tramitesDisponibles.filter(t=>t.id!==tramiteId);
+ const tipoSeleccionado=useMemo(()=>tiposCita.find(t=>t.id===tipoId),[tiposCita,tipoId]);
+ const esSimulacro=(tipoSeleccionado?.nombre??"").toLowerCase().includes("simulacr");
+
+ useEffect(()=>{if(!open)return;void(async()=>{const t=await obtenerTiposCita();if(t.success&&t.data)setTiposCita(t.data)})()},[open]);
+ useEffect(()=>{if(!esSimulacro)setCabina(false)},[esSimulacro]);
+ function toggle(id:string){setParticipantes(v=>v.includes(id)?v.filter(x=>x!==id):[...v,id])}
+ function cerrar(v:boolean){if(!v){setTipoId("");setFechaHora("");setLugar("");setNotas("");setParticipantes([]);setCabina(false)}onOpenChange(v)}
+ async function submit(e:React.FormEvent){
+  e.preventDefault();
+  if(!session?.user?.id)return;
+  if(!tipoId)return toast.error("Selecciona el tipo de cita");
+  if(!fechaHora)return toast.error("Registra fecha y hora");
+  setIsSubmitting(true);
+  const r=await crearCitaIncluida({
+   tramiteId:tramiteId??null,
+   grupoFamiliarId:grupoFamiliarId??null,
+   tipoCitaId:tipoId,
+   fechaHora,
+   lugar:cabina?"Centro de Simulación Consular · Cabina":lugar||null,
+   notas:notas||null,
+   participanteTramiteIds:participantes,
+  },session.user.id);
+  setIsSubmitting(false);
+  if(r.success&&r.data){toast.success(cabina?"Simulacro en cabina programado correctamente":"Cita programada correctamente");cerrar(false);onSuccess(r.data.id)}else toast.error(r.error??"Error al programar");
+ }
+
+ return <Sheet open={open} onOpenChange={cerrar}><SheetContent className="w-full sm:max-w-lg overflow-y-auto p-4"><SheetHeader><SheetTitle>{grupoFamiliarId?"Programar Cita Grupal":"Programar Cita"}</SheetTitle></SheetHeader><form onSubmit={submit} className="mt-6 space-y-5">
+  <div className="space-y-2"><Label>Tipo de cita *</Label><Select value={tipoId} onValueChange={setTipoId}><SelectTrigger><SelectValue placeholder="Selecciona tipo de cita"/></SelectTrigger><SelectContent>{tiposCita.map(t=><SelectItem key={t.id} value={t.id}>{t.nombre}</SelectItem>)}</SelectContent></Select></div>
+  {esSimulacro&&<div className="rounded-lg border border-primary/30 bg-primary/5 p-4"><label className="flex items-start gap-3 cursor-pointer"><Checkbox checked={cabina} onCheckedChange={v=>setCabina(v===true)}/><div><p className="font-semibold">Simulacro en Centro de Simulación Consular</p><p className="text-xs text-muted-foreground">Opción operativa incluida en el servicio contratado. No genera un segundo cobro desde esta agenda.</p></div></label></div>}
+  <div className="grid grid-cols-2 gap-4"><div className="space-y-2"><Label>Fecha y hora *</Label><Input type="datetime-local" value={fechaHora} onChange={e=>setFechaHora(e.target.value)}/></div><div className="space-y-2"><Label>Lugar</Label><Input disabled={cabina} placeholder="Embajada, consulado..." value={cabina?"Centro de Simulación Consular · Cabina":lugar} onChange={e=>setLugar(e.target.value)}/></div></div>
+  <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">La cita o simulacro está asociado al servicio ya contratado. Precios, descuentos y estado de pago se administran únicamente desde <b>Servicios y Trámites</b>.</div>
+  {otros.length>0&&<div className="space-y-2"><Label>Participantes adicionales</Label>{otros.map(t=><label key={t.id} className="flex gap-3 border rounded p-2"><Checkbox checked={participantes.includes(t.id)} onCheckedChange={()=>toggle(t.id)}/><span>{t.cliente.nombres} {t.cliente.apellidos}</span></label>)}</div>}
+  <div><Label>Notas</Label><Textarea rows={3} value={notas} onChange={e=>setNotas(e.target.value)}/></div>
+  <div className="flex gap-3"><Button type="button" variant="outline" className="flex-1" onClick={()=>cerrar(false)}>Cancelar</Button><Button type="submit" className="flex-1" disabled={isSubmitting}>{isSubmitting&&<Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Programar</Button></div>
+ </form></SheetContent></Sheet>
+}
