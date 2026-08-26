@@ -1,7 +1,7 @@
 "use client";
 
 import type { RowSelectionState } from "@tanstack/react-table";
-import { CheckSquare, Plus, Search, X } from "lucide-react";
+import { CheckSquare, History, Plus, Search, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import { confirmarServicioHistoricoClientes } from "@/lib/actions/clientes/sanea
 import { convertirClienteSinServicioAProspecto } from "@/lib/actions/prospectos/prospecto-cliente-actions";
 import { GESTIONES_NEXUS } from "@/lib/nexus/gestiones";
 import type { ClienteListItem } from "@/types/cliente-types";
+import { ClienteHistoricoDrawer } from "./cliente-historico-drawer";
 import { ClientFormDrawer } from "./client-form-drawer";
 import { createClientColumns } from "./client-table-columns";
 import { GrupoFamiliarDrawer } from "./grupo-familiar-drawer";
@@ -30,7 +31,7 @@ export function ClientList({ initialClientes, regiones, onRefresh }: { initialCl
   const gestionId = searchParams.get("gestion");
   const gestion = GESTIONES_NEXUS.find((g)=>g.id===gestionId);
   const [searchQuery,setSearchQuery]=useState(""); const [activeTab,setActiveTab]=useState<TabClientes>("activos"); const [rowSelection,setRowSelection]=useState<RowSelectionState>({});
-  const [selectedCliente,setSelectedCliente]=useState<ClienteListItem|null>(null); const [isFormOpen,setIsFormOpen]=useState(false); const [clienteGrupoFamiliar,setClienteGrupoFamiliar]=useState<ClienteListItem|null>(null); const [isGrupoFamiliarOpen,setIsGrupoFamiliarOpen]=useState(false);
+  const [selectedCliente,setSelectedCliente]=useState<ClienteListItem|null>(null); const [isFormOpen,setIsFormOpen]=useState(false); const [isHistoricoOpen,setIsHistoricoOpen]=useState(false); const [clienteGrupoFamiliar,setClienteGrupoFamiliar]=useState<ClienteListItem|null>(null); const [isGrupoFamiliarOpen,setIsGrupoFamiliarOpen]=useState(false);
   const [clienteToDelete,setClienteToDelete]=useState<ClienteListItem|null>(null); const [clienteToProspect,setClienteToProspect]=useState<ClienteComercial|null>(null); const [confirmHistoricos,setConfirmHistoricos]=useState(false);
 
   const activos=initialClientes.filter(c=>c.activo); const porRevisar=initialClientes.filter(c=>c.activo&&c.sinServicio); const inactivos=initialClientes.filter(c=>!c.activo);
@@ -48,12 +49,13 @@ export function ClientList({ initialClientes, regiones, onRefresh }: { initialCl
 
   return <>
     {gestion&&<div className="rounded-lg border border-primary/30 bg-primary/5 p-4"><p className="font-semibold">Gestión seleccionada: {gestion.nombre}</p><p className="mt-1 text-sm text-muted-foreground">Busca al cliente y usa “Ver detalle”. NEXUS abrirá directamente su flujo de Servicios y Trámites con esta gestión como contexto.</p></div>}
-    <Card><CardHeader><div className="flex items-center justify-between gap-4"><div><CardTitle>Lista de Clientes</CardTitle><p className="mt-1 text-sm text-muted-foreground">Saneamiento histórico: confirma quién sí tomó servicio o devuelve a Prospectos a quien todavía requiere gestión comercial.</p></div><Button onClick={()=>setIsFormOpen(true)}><Plus className="mr-2 h-4 w-4"/>Nuevo cliente</Button></div></CardHeader><CardContent>
+    <Card><CardHeader><div className="flex items-center justify-between gap-4"><div><CardTitle>Lista de Clientes</CardTitle><p className="mt-1 text-sm text-muted-foreground">Saneamiento histórico: confirma quién sí tomó servicio o devuelve a Prospectos a quien todavía requiere gestión comercial.</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>setIsHistoricoOpen(true)}><History className="mr-2 h-4 w-4"/>Registrar Cliente Histórico</Button><Button onClick={()=>setIsFormOpen(true)}><Plus className="mr-2 h-4 w-4"/>Nuevo cliente</Button></div></div></CardHeader><CardContent>
       <div className="mb-4 space-y-4"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><Input className="pl-10" placeholder="Buscar por nombre, email, teléfono o responsable..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/></div>
       {selectedIds.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted p-4"><div className="flex items-center gap-2"><CheckSquare className="h-5 w-5 text-primary"/><span className="font-medium">{selectedIds.length} seleccionado(s)</span><Button variant="ghost" size="sm" onClick={()=>setRowSelection({})}><X className="mr-1 h-4 w-4"/>Limpiar</Button></div>{activeTab==="por_revisar"&&<Button size="sm" onClick={()=>setConfirmHistoricos(true)}>Servicio tomado</Button>}</div>}</div>
       <Tabs value={activeTab} onValueChange={v=>{setActiveTab(v as TabClientes);setRowSelection({});}}><TabsList className="grid w-full max-w-2xl grid-cols-3"><TabsTrigger value="activos">Clientes <Badge variant="secondary" className="ml-2">{activos.length}</Badge></TabsTrigger><TabsTrigger value="por_revisar">Por revisar <Badge variant="secondary" className="ml-2">{porRevisar.length}</Badge></TabsTrigger><TabsTrigger value="inactivos">Inactivos <Badge variant="secondary" className="ml-2">{inactivos.length}</Badge></TabsTrigger></TabsList>
       {(["activos","por_revisar","inactivos"] as const).map(tab=><TabsContent key={tab} value={tab} className="mt-4">{tab==="por_revisar"&&<div className="mb-4 rounded-lg border p-4 text-sm"><p className="font-medium">Depuración extraordinaria de la base histórica</p><p className="mt-1 text-muted-foreground">Selecciona quienes realmente tomaron un servicio y pulsa “Servicio tomado”. Los demás permanecerán aquí hasta que se confirme su situación o se envíen individualmente a Prospectos.</p></div>}<DataTable columns={columns} data={filtered} onRowSelectionChange={setRowSelection} rowSelection={rowSelection}/></TabsContent>)}</Tabs>
     </CardContent></Card>
+    <ClienteHistoricoDrawer open={isHistoricoOpen} onOpenChange={setIsHistoricoOpen} regiones={regiones} onSuccess={refresh}/>
     <ClientFormDrawer open={isFormOpen} onOpenChange={o=>{setIsFormOpen(o);if(!o)setSelectedCliente(null);}} cliente={selectedCliente} regiones={regiones} onSuccess={()=>{onRefresh();setIsFormOpen(false);setSelectedCliente(null);}}/>
     {clienteGrupoFamiliar&&<GrupoFamiliarDrawer open={isGrupoFamiliarOpen} onOpenChange={o=>{setIsGrupoFamiliarOpen(o);if(!o)setClienteGrupoFamiliar(null);}} cliente={clienteGrupoFamiliar} onSuccess={onRefresh}/>} 
     <ConfirmationDialog open={confirmHistoricos} onOpenChange={setConfirmHistoricos} onConfirm={marcarHistoricos} title="¿Confirmar servicio histórico?" description={`Marcarás ${selectedIds.length} registro(s) como clientes que sí tomaron servicio antes del saneamiento de NEXUS. Esto no inventará un servicio ni un monto; solo los excluirá de la bandeja “Por revisar”.`} confirmText="Confirmar servicio tomado" variant="default"/>
