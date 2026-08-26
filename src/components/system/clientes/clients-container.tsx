@@ -3,12 +3,15 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { History } from "lucide-react";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { obtenerTodasLasRegiones } from "@/lib/actions/catalogos/regiones-actions";
 import { obtenerTodosLosClientes } from "@/lib/actions/clientes/clientes-actions";
 import type { ClienteListItem } from "@/types/cliente-types";
 import { ClientList } from "./client-list";
+import { ClienteHistoricoDrawer } from "./cliente-historico-drawer";
 
 function LoadingSkeleton() {
   return (
@@ -30,17 +33,12 @@ function LoadingSkeleton() {
   );
 }
 
-/**
- * Contenedor principal para el módulo de clientes
- * Implementa patrón Facade para simplificar la carga de datos
- * y proporcionar una interfaz unificada a los componentes hijos
- */
+/** Contenedor principal para el módulo de clientes. */
 export function ClientsContainer() {
   const [isLoading, setIsLoading] = useState(true);
+  const [isHistoricoOpen, setIsHistoricoOpen] = useState(false);
   const [clientes, setClientes] = useState<ClienteListItem[]>([]);
-  const [regiones, setRegiones] = useState<
-    Array<{ id: string; nombre: string }>
-  >([]);
+  const [regiones, setRegiones] = useState<Array<{ id: string; nombre: string }>>([]);
 
   const loadData = async () => {
     setIsLoading(true);
@@ -49,18 +47,8 @@ export function ClientsContainer() {
         obtenerTodosLosClientes(),
         obtenerTodasLasRegiones(),
       ]);
-
-      setClientes(
-        clientesResult.success && clientesResult.data
-          ? clientesResult.data
-          : [],
-      );
-
-      setRegiones(
-        regionesResult.success && regionesResult.data
-          ? regionesResult.data
-          : [],
-      );
+      setClientes(clientesResult.success && clientesResult.data ? clientesResult.data : []);
+      setRegiones(regionesResult.success && regionesResult.data ? regionesResult.data : []);
     } catch (error) {
       console.error("Error loading clients data:", error);
     } finally {
@@ -68,20 +56,13 @@ export function ClientsContainer() {
     }
   };
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  useEffect(() => { loadData(); }, []);
 
   if (isLoading) {
     return (
       <div className="flex-1 space-y-6 p-8 pt-6">
         <div className="flex items-center justify-between">
-          <div>
-            <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
-            <p className="text-muted-foreground">
-              Gestiona los clientes y sus datos
-            </p>
-          </div>
+          <div><h2 className="text-3xl font-bold tracking-tight">Clientes</h2><p className="text-muted-foreground">Gestiona los clientes y sus datos</p></div>
         </div>
         <LoadingSkeleton />
       </div>
@@ -90,18 +71,21 @@ export function ClientsContainer() {
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
-      <div className="flex items-center justify-between">
+      <div className="flex items-center justify-between gap-4">
         <div>
           <h2 className="text-3xl font-bold tracking-tight">Clientes</h2>
-          <p className="text-muted-foreground">
-            Gestiona los clientes y sus datos
-          </p>
+          <p className="text-muted-foreground">Gestiona los clientes y sus datos</p>
         </div>
+        <Button variant="outline" onClick={() => setIsHistoricoOpen(true)}>
+          <History className="mr-2 h-4 w-4" /> Registrar Cliente Histórico
+        </Button>
       </div>
-      <ClientList
-        initialClientes={clientes}
+      <ClientList initialClientes={clientes} regiones={regiones} onRefresh={loadData} />
+      <ClienteHistoricoDrawer
+        open={isHistoricoOpen}
+        onOpenChange={setIsHistoricoOpen}
         regiones={regiones}
-        onRefresh={loadData}
+        onSuccess={loadData}
       />
     </div>
   );
