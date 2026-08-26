@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { ETAPAS_CHINA, guardarChinaOperativo, obtenerChinaOperativo, type ChinaOperativo, type EtapaChina, type SedeChina } from "@/lib/actions/china/china-actions";
+import { guardarChinaOperativo, obtenerChinaOperativo } from "@/lib/actions/china/china-actions";
+import { ETAPAS_CHINA, type ChinaOperativo, type EtapaChina, type SedeChina } from "@/lib/actions/china/china-types";
 
 const LABELS: Record<EtapaChina,string> = {
   RECOLECCION_DOCUMENTOS:"Recolección de documentos",
