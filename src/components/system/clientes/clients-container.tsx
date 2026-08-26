@@ -50,8 +50,8 @@ export function ClientsContainer() {
 
   if (mostrandoAfiliados) {
     return <div className="flex-1 space-y-6 p-8 pt-6">
-      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-3xl font-bold tracking-tight">Clientes Afiliados</h2><p className="text-muted-foreground">Clientes que ya forman parte de la red comercial de referidos, fidelización y campañas NEXUS.</p></div><Button variant="outline" onClick={()=>router.push("/clients")}><ArrowLeft className="mr-2 h-4 w-4"/>Volver a Clientes</Button></div>
-      <AfiliadosPanel clientes={clientes.filter((c) => c.activo)} />
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-3xl font-bold tracking-tight">Clientes Afiliados</h2><p className="text-muted-foreground">Separa claramente los clientes plenamente afiliados de quienes todavía están pendientes de afiliación.</p></div><Button variant="outline" onClick={()=>router.push("/clients")}><ArrowLeft className="mr-2 h-4 w-4"/>Volver a Clientes</Button></div>
+      <AfiliadosPanel clientes={clientes} />
     </div>;
   }
 
