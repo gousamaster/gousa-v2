@@ -4,7 +4,13 @@ import { betterAuth } from "better-auth";
 import { prismaAdapter } from "better-auth/adapters/prisma";
 import { nextCookies } from "better-auth/next-js";
 import { admin, organization } from "better-auth/plugins";
+import { createAccessControl } from "better-auth/plugins/access";
+import { adminAc, defaultStatements } from "better-auth/plugins/admin/access";
 import { db } from "@/lib/db";
+
+const accessControl = createAccessControl(defaultStatements);
+const nexusAdminRole = accessControl.newRole({ ...adminAc.statements });
+const nexusUserRole = accessControl.newRole({});
 
 export const auth = betterAuth({
   database: prismaAdapter(db, {
@@ -31,9 +37,18 @@ export const auth = betterAuth({
   plugins: [
     nextCookies(),
 
-    // Plugin de administración. NEXUS utiliza los roles propios SUPER_ADMIN / ADMIN.
+    // Better Auth requiere declarar explícitamente los roles personalizados.
+    // SUPER_ADMIN y ADMIN reciben permisos administrativos; los demás no.
     admin({
-      adminRoles: ["SUPER_ADMIN", "ADMIN"],
+      ac: accessControl,
+      roles: {
+        SUPER_ADMIN: nexusAdminRole,
+        ADMIN: nexusAdminRole,
+        MANAGER: nexusUserRole,
+        SUPERVISOR: nexusUserRole,
+        USER: nexusUserRole,
+      },
+      defaultRole: "USER",
       impersonationSessionDuration: 60 * 60, // 1 hora
     }),
 
