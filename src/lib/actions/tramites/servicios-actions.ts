@@ -1,9 +1,10 @@
 // src/lib/actions/tramites/servicios-actions.ts
-
 "use server";
 
-import { Prisma } from "@prisma/client";
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { registrarAuditoriaNexus } from "@/lib/auditoria-nexus";
 import type { ActionResult } from "@/types/action-result-types";
 import {
   type CambiarEstadoPagoFormData,
@@ -20,219 +21,35 @@ export type ServicioCatalogo = {
   codigo: string;
   requiereTramite: boolean;
   precioRegion: number | null;
+  esSolicitudVisa: boolean;
 };
+export type ClienteServicioItem = {id:string;precioAcordado:number;descuentoAplicado:number|null;precioFinal:number;notas:string|null;createdAt:Date;servicio:{id:string;nombre:string;codigo:string;requiereTramite:boolean};estadoPago:{id:string;nombre:string;color:string|null};tramite:{id:string;estadoActual:{nombre:string;color:string|null}}|null};
+export type ResumenPagoNexus={total:number;abonado:number;saldo:number;pagos:Array<{id:string;monto:number;modalidad:string;confirmado:boolean;notificado:boolean;observacion:string|null;usuarioNombre:string|null;createdAt:Date}>};
+export type FacturacionNexus={solicitaFactura:boolean;nombreRazonSocial:string|null;nit:string|null;actualizadoPorNombre:string|null;updatedAt:Date|null};
 
-export type ClienteServicioItem = {
-  id: string;
-  precioAcordado: number;
-  descuentoAplicado: number | null;
-  precioFinal: number;
-  notas: string | null;
-  createdAt: Date;
-  servicio: {
-    id: string;
-    nombre: string;
-    codigo: string;
-    requiereTramite: boolean;
-  };
-  estadoPago: { id: string; nombre: string; color: string | null };
-  tramite: {
-    id: string;
-    estadoActual: { nombre: string; color: string | null };
-  } | null;
-};
+function esSolicitudVisa(nombre:string){return /^(Solicitud\s+.*Visa|Visa\s+China\s*\+\s*Canton\s+Fair\s+Pack)/i.test(nombre.trim())}
+function esPagoContado(nombre:string){return /contado/i.test(nombre)}
+async function obtenerUsuarioActual(){const session=await auth.api.getSession({headers:await headers()});if(!session?.user?.id)return null;return db.user.findUnique({where:{id:session.user.id},select:{id:true,role:true}})}
+function puedeEditarPrecio(role:string|null|undefined){return role==="SUPER_ADMIN"||role==="MANAGER"}
 
-export async function obtenerCatalogosServicioConPrecio(
-  regionId: string,
-): Promise<ActionResult<ServicioCatalogo[]>> {
-  try {
-    const servicios = await db.catalogoServicio.findMany({
-      where: { activo: true },
-      include: {
-        preciosPorRegion: {
-          where: { regionId, activo: true },
-          take: 1,
-        },
-      },
-      orderBy: { orden: "asc" },
-    });
+export async function obtenerPermisosPrecioServicio():Promise<ActionResult<{puedeEditarPrecio:boolean}>>{try{const u=await obtenerUsuarioActual();if(!u)return{success:false,error:"No autorizado"};return{success:true,data:{puedeEditarPrecio:puedeEditarPrecio(u.role)}}}catch(e){console.error(e);return{success:false,error:"No se pudieron cargar los permisos"}}}
 
-    const data = servicios.map((s) => ({
-      id: s.id,
-      nombre: s.nombre,
-      codigo: s.codigo,
-      requiereTramite: s.requiereTramite,
-      precioRegion: s.preciosPorRegion[0]
-        ? Number(s.preciosPorRegion[0].precio)
-        : null,
-    }));
+export async function obtenerCatalogosServicioConPrecio(regionId:string):Promise<ActionResult<ServicioCatalogo[]>>{try{const servicios=await db.catalogoServicio.findMany({where:{activo:true},include:{preciosPorRegion:{where:{regionId,activo:true},take:1}},orderBy:{orden:"asc"}});return{success:true,data:servicios.map(s=>({id:s.id,nombre:s.nombre,codigo:s.codigo,requiereTramite:s.requiereTramite,precioRegion:s.preciosPorRegion[0]?Number(s.preciosPorRegion[0].precio):null,esSolicitudVisa:esSolicitudVisa(s.nombre)}))}}catch(e){console.error(e);return{success:false,error:"Error al obtener los servicios"}}}
+export async function obtenerServiciosDeCliente(clienteId:string):Promise<ActionResult<ClienteServicioItem[]>>{try{const servicios=await db.clienteServicio.findMany({where:{clienteId,deletedAt:null},include:{servicio:{select:{id:true,nombre:true,codigo:true,requiereTramite:true}},estadoPago:{select:{id:true,nombre:true,color:true}},tramites:{where:{deletedAt:null},include:{estadoActual:{select:{nombre:true,color:true}}},take:1,orderBy:{createdAt:"desc"}}},orderBy:{createdAt:"desc"}});return{success:true,data:servicios.map(s=>({id:s.id,precioAcordado:Number(s.precioAcordado),descuentoAplicado:s.descuentoAplicado?Number(s.descuentoAplicado):null,precioFinal:Number(s.precioFinal),notas:s.notas,createdAt:s.createdAt,servicio:s.servicio,estadoPago:s.estadoPago,tramite:s.tramites[0]?{id:s.tramites[0].id,estadoActual:s.tramites[0].estadoActual}:null}))}}catch(e){console.error(e);return{success:false,error:"Error al obtener los servicios"}}}
 
-    return { success: true, data };
-  } catch (error) {
-    console.error("Error al obtener catálogo de servicios:", error);
-    return { success: false, error: "Error al obtener los servicios" };
-  }
-}
+export async function crearClienteServicio(input:CreateClienteServicioFormData):Promise<ActionResult<{id:string;requiereTramite:boolean}>>{try{const v=createClienteServicioSchema.parse(input);const u=await obtenerUsuarioActual();if(!u)return{success:false,error:"No autorizado"};const[servicio,cliente,estadoPago]=await Promise.all([db.catalogoServicio.findUnique({where:{id:v.servicioId}}),db.cliente.findUnique({where:{id:v.clienteId},select:{regionId:true}}),db.catalogoEstadoPago.findUnique({where:{id:v.estadoPagoId},select:{nombre:true}})]);if(!servicio||!cliente||!estadoPago)return{success:false,error:"Datos del servicio incompletos"};const tarifa=await db.servicioPrecioPorRegion.findUnique({where:{servicioId_regionId:{servicioId:servicio.id,regionId:cliente.regionId}},select:{precio:true,activo:true}});if(!tarifa?.activo)return{success:false,error:"El servicio no tiene una tarifa activa para esta región"};const oficial=Number(tarifa.precio),privilegiado=puedeEditarPrecio(u.role),precioAcordado=privilegiado?Number(v.precioAcordado):oficial;if(!Number.isFinite(precioAcordado)||precioAcordado<0)return{success:false,error:"Monto inválido"};if(!privilegiado&&Math.abs(Number(v.precioAcordado)-oficial)>.001)return{success:false,error:"Solo Manager o Super Admin pueden modificar la tarifa oficial"};const descuentoContado=esSolicitudVisa(servicio.nombre)&&esPagoContado(estadoPago.nombre)?50:0;const descuentoManual=privilegiado&&descuentoContado===0?Number(v.descuentoAplicado??0):0;const descuentoAplicado=descuentoContado||descuentoManual;const precioFinal=Math.max(0,precioAcordado-descuentoAplicado);const cs=await db.clienteServicio.create({data:{clienteId:v.clienteId,servicioId:v.servicioId,precioAcordado,descuentoAplicado:descuentoAplicado||null,precioFinal,estadoPagoId:v.estadoPagoId,notas:v.notas??null}});await registrarAuditoriaNexus({accion:"SERVICIO CONTRATADO",entidad:"Servicio",entidadId:cs.id,clienteId:v.clienteId,usuarioId:u.id,detalle:`${servicio.nombre} · ${precioFinal.toLocaleString("es-BO")} Bs.${descuentoContado?" · Descuento contado Bs. 50":""}`});return{success:true,data:{id:cs.id,requiereTramite:servicio.requiereTramite}}}catch(e){console.error(e);return{success:false,error:"Error al contratar el servicio"}}}
 
-export async function obtenerServiciosDeCliente(
-  clienteId: string,
-): Promise<ActionResult<ClienteServicioItem[]>> {
-  try {
-    const servicios = await db.clienteServicio.findMany({
-      where: { clienteId, deletedAt: null },
-      include: {
-        servicio: {
-          select: {
-            id: true,
-            nombre: true,
-            codigo: true,
-            requiereTramite: true,
-          },
-        },
-        estadoPago: {
-          select: { id: true, nombre: true, color: true },
-        },
-        tramites: {
-          where: { deletedAt: null },
-          include: {
-            estadoActual: { select: { nombre: true, color: true } },
-          },
-          take: 1,
-          orderBy: { createdAt: "desc" },
-        },
-      },
-      orderBy: { createdAt: "desc" },
-    });
+export async function actualizarClienteServicio(id:string,input:UpdateClienteServicioFormData):Promise<ActionResult<void>>{try{const v=updateClienteServicioSchema.parse(input);const u=await obtenerUsuarioActual();if(!u)return{success:false,error:"No autorizado"};const tocaPrecio=v.precioAcordado!==undefined||v.descuentoAplicado!==undefined||v.precioFinal!==undefined;if(tocaPrecio&&!puedeEditarPrecio(u.role))return{success:false,error:"Solo Manager o Super Admin pueden modificar precios"};const actual=await db.clienteServicio.findUnique({where:{id},select:{clienteId:true}});await db.clienteServicio.update({where:{id},data:v});if(actual)await registrarAuditoriaNexus({accion:"SERVICIO MODIFICADO",entidad:"Servicio",entidadId:id,clienteId:actual.clienteId,usuarioId:u.id,detalle:"Se actualizaron datos del servicio contratado"});return{success:true}}catch(e){console.error(e);return{success:false,error:"Error al actualizar el servicio"}}}
 
-    const data: ClienteServicioItem[] = servicios.map((s) => ({
-      id: s.id,
-      precioAcordado: Number(s.precioAcordado),
-      descuentoAplicado: s.descuentoAplicado
-        ? Number(s.descuentoAplicado)
-        : null,
-      precioFinal: Number(s.precioFinal),
-      notas: s.notas,
-      createdAt: s.createdAt,
-      servicio: s.servicio,
-      estadoPago: s.estadoPago,
-      tramite: s.tramites[0]
-        ? { id: s.tramites[0].id, estadoActual: s.tramites[0].estadoActual }
-        : null,
-    }));
+async function ensureCambio(){await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "cliente_servicio_cambio_nexus" ("id" TEXT PRIMARY KEY,"clienteServicioId" TEXT NOT NULL REFERENCES "cliente_servicio"("id") ON DELETE CASCADE,"servicioAnteriorId" TEXT NOT NULL,"servicioNuevoId" TEXT NOT NULL,"precioAnterior" DECIMAL(12,2) NOT NULL,"precioNuevo" DECIMAL(12,2) NOT NULL,"motivo" TEXT,"usuarioId" TEXT REFERENCES "user"("id") ON DELETE SET NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`)}
+async function ensurePagos(){await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "cliente_servicio_pago_nexus" ("id" TEXT PRIMARY KEY,"clienteServicioId" TEXT NOT NULL REFERENCES "cliente_servicio"("id") ON DELETE CASCADE,"monto" DECIMAL(12,2) NOT NULL,"modalidad" TEXT NOT NULL,"confirmado" BOOLEAN NOT NULL DEFAULT false,"notificado" BOOLEAN NOT NULL DEFAULT false,"observacion" TEXT,"usuarioId" TEXT REFERENCES "user"("id") ON DELETE SET NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`)}
+async function ensureFacturacion(){await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "cliente_servicio_facturacion_nexus" ("clienteServicioId" TEXT PRIMARY KEY REFERENCES "cliente_servicio"("id") ON DELETE CASCADE,"solicitaFactura" BOOLEAN NOT NULL DEFAULT false,"nombreRazonSocial" TEXT,"nit" TEXT,"actualizadoPorId" TEXT REFERENCES "user"("id") ON DELETE SET NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`)}
 
-    return { success: true, data };
-  } catch (error) {
-    console.error("Error al obtener servicios del cliente:", error);
-    return { success: false, error: "Error al obtener los servicios" };
-  }
-}
+export async function cambiarServicioContratado(input:{clienteServicioId:string;servicioNuevoId:string;precioNuevo:number;motivo?:string|null}):Promise<ActionResult<void>>{try{await ensureCambio();const u=await obtenerUsuarioActual();if(!u)return{success:false,error:"No autorizado"};const actual=await db.clienteServicio.findUnique({where:{id:input.clienteServicioId},include:{servicio:true,cliente:{select:{regionId:true}}}});if(!actual)return{success:false,error:"Servicio contratado no encontrado"};const nuevo=await db.catalogoServicio.findUnique({where:{id:input.servicioNuevoId}});if(!nuevo)return{success:false,error:"Nuevo servicio no encontrado"};const tarifa=await db.servicioPrecioPorRegion.findUnique({where:{servicioId_regionId:{servicioId:nuevo.id,regionId:actual.cliente.regionId}},select:{precio:true,activo:true}});if(!tarifa?.activo)return{success:false,error:"El nuevo servicio no tiene tarifa activa para esta región"};const oficial=Number(tarifa.precio),privilegiado=puedeEditarPrecio(u.role),p=privilegiado?Number(input.precioNuevo):oficial;if(!Number.isFinite(p)||p<0)return{success:false,error:"Monto inválido"};if(!privilegiado&&Math.abs(Number(input.precioNuevo)-oficial)>.001)return{success:false,error:"Solo Manager o Super Admin pueden modificar la tarifa oficial"};await db.$transaction(async tx=>{await tx.clienteServicio.update({where:{id:actual.id},data:{servicioId:nuevo.id,precioAcordado:p,precioFinal:p,descuentoAplicado:null,notas:[actual.notas,input.motivo?`Cambio de servicio: ${input.motivo}`:null].filter(Boolean).join("\n")||null}});await tx.$executeRaw`INSERT INTO "cliente_servicio_cambio_nexus" ("id","clienteServicioId","servicioAnteriorId","servicioNuevoId","precioAnterior","precioNuevo","motivo","usuarioId","createdAt") VALUES (${crypto.randomUUID()},${actual.id},${actual.servicioId},${nuevo.id},${Number(actual.precioFinal)},${p},${input.motivo?.trim()||null},${u.id},NOW())`});await registrarAuditoriaNexus({accion:"SERVICIO / MODALIDAD CAMBIADO",entidad:"Servicio",entidadId:actual.id,clienteId:actual.clienteId,usuarioId:u.id,detalle:`${actual.servicio.nombre} → ${nuevo.nombre} · ${Number(actual.precioFinal).toLocaleString("es-BO")} → ${p.toLocaleString("es-BO")} Bs.${input.motivo?` · ${input.motivo}`:""}`});return{success:true}}catch(e){console.error(e);return{success:false,error:"No se pudo cambiar el servicio"}}}
 
-export async function crearClienteServicio(
-  input: CreateClienteServicioFormData,
-): Promise<ActionResult<{ id: string; requiereTramite: boolean }>> {
-  try {
-    const validated = createClienteServicioSchema.parse(input);
-
-    const [cliente, servicio, estadoPago] = await Promise.all([
-      db.cliente.findUnique({ where: { id: validated.clienteId } }),
-      db.catalogoServicio.findUnique({ where: { id: validated.servicioId } }),
-      db.catalogoEstadoPago.findUnique({
-        where: { id: validated.estadoPagoId },
-      }),
-    ]);
-
-    if (!cliente) return { success: false, error: "Cliente no encontrado" };
-    if (!servicio) return { success: false, error: "Servicio no encontrado" };
-    if (!estadoPago)
-      return { success: false, error: "Estado de pago no encontrado" };
-
-    const clienteServicio = await db.clienteServicio.create({
-      data: {
-        clienteId: validated.clienteId,
-        servicioId: validated.servicioId,
-        precioAcordado: validated.precioAcordado,
-        descuentoAplicado: validated.descuentoAplicado ?? null,
-        precioFinal: validated.precioFinal,
-        estadoPagoId: validated.estadoPagoId,
-        notas: validated.notas ?? null,
-      },
-    });
-
-    return {
-      success: true,
-      data: {
-        id: clienteServicio.id,
-        requiereTramite: servicio.requiereTramite,
-      },
-    };
-  } catch (error) {
-    console.error("Error al crear servicio:", error);
-    return { success: false, error: "Error al contratar el servicio" };
-  }
-}
-
-export async function actualizarClienteServicio(
-  id: string,
-  input: UpdateClienteServicioFormData,
-): Promise<ActionResult<void>> {
-  try {
-    const validated = updateClienteServicioSchema.parse(input);
-
-    const existe = await db.clienteServicio.findUnique({ where: { id } });
-    if (!existe) return { success: false, error: "Servicio no encontrado" };
-
-    await db.clienteServicio.update({ where: { id }, data: validated });
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error al actualizar servicio:", error);
-    return { success: false, error: "Error al actualizar el servicio" };
-  }
-}
-
-export async function obtenerEstadosPago(): Promise<
-  ActionResult<Array<{ id: string; nombre: string; color: string | null }>>
-> {
-  try {
-    const estados = await db.catalogoEstadoPago.findMany({
-      where: { activo: true },
-      select: { id: true, nombre: true, color: true },
-      orderBy: { orden: "asc" },
-    });
-    return { success: true, data: estados };
-  } catch (error) {
-    console.error("Error al obtener estados de pago:", error);
-    return { success: false, error: "Error al obtener estados de pago" };
-  }
-}
-
-export async function cambiarEstadoPagoServicio(
-  clienteServicioId: string,
-  input: CambiarEstadoPagoFormData,
-): Promise<ActionResult<void>> {
-  try {
-    const validated = cambiarEstadoPagoSchema.parse(input);
-
-    const [clienteServicio, estadoPago] = await Promise.all([
-      db.clienteServicio.findUnique({ where: { id: clienteServicioId } }),
-      db.catalogoEstadoPago.findUnique({
-        where: { id: validated.estadoPagoId },
-      }),
-    ]);
-
-    if (!clienteServicio)
-      return { success: false, error: "Servicio no encontrado" };
-    if (!estadoPago)
-      return { success: false, error: "Estado de pago no encontrado" };
-
-    await db.clienteServicio.update({
-      where: { id: clienteServicioId },
-      data: { estadoPagoId: validated.estadoPagoId },
-    });
-
-    return { success: true };
-  } catch (error) {
-    console.error("Error al cambiar estado de pago:", error);
-    return { success: false, error: "Error al cambiar el estado de pago" };
-  }
-}
+export async function obtenerEstadosPago():Promise<ActionResult<Array<{id:string;nombre:string;color:string|null}>>>{try{return{success:true,data:await db.catalogoEstadoPago.findMany({where:{activo:true},select:{id:true,nombre:true,color:true},orderBy:{orden:"asc"}})}}catch(e){console.error(e);return{success:false,error:"Error al obtener estados de pago"}}}
+export async function cambiarEstadoPagoServicio(clienteServicioId:string,input:CambiarEstadoPagoFormData):Promise<ActionResult<void>>{try{const v=cambiarEstadoPagoSchema.parse(input);const cs=await db.clienteServicio.findUnique({where:{id:clienteServicioId},select:{clienteId:true}});const estado=await db.catalogoEstadoPago.findUnique({where:{id:v.estadoPagoId},select:{nombre:true}});await db.clienteServicio.update({where:{id:clienteServicioId},data:{estadoPagoId:v.estadoPagoId}});if(cs)await registrarAuditoriaNexus({accion:"ESTADO DE PAGO CAMBIADO",entidad:"Pago",entidadId:clienteServicioId,clienteId:cs.clienteId,detalle:estado?.nombre??"Estado actualizado"});return{success:true}}catch(e){console.error(e);return{success:false,error:"Error al cambiar el estado de pago"}}}
+export async function obtenerResumenPagoNexus(clienteServicioId:string):Promise<ActionResult<ResumenPagoNexus>>{try{await ensurePagos();const cs=await db.clienteServicio.findUnique({where:{id:clienteServicioId},select:{precioFinal:true}});if(!cs)return{success:false,error:"Servicio no encontrado"};const pagos=await db.$queryRaw<Array<{id:string;monto:unknown;modalidad:string;confirmado:boolean;notificado:boolean;observacion:string|null;usuarioNombre:string|null;createdAt:Date}>>`SELECT p."id",p."monto",p."modalidad",p."confirmado",p."notificado",p."observacion",u."name" AS "usuarioNombre",p."createdAt" FROM "cliente_servicio_pago_nexus" p LEFT JOIN "user" u ON u."id"=p."usuarioId" WHERE p."clienteServicioId"=${clienteServicioId} ORDER BY p."createdAt" DESC`;const total=Number(cs.precioFinal);const items=pagos.map(p=>({...p,monto:Number(p.monto)}));const abonado=items.reduce((a,p)=>a+p.monto,0);return{success:true,data:{total,abonado,saldo:Math.max(0,total-abonado),pagos:items}}}catch(e){console.error(e);return{success:false,error:"No se pudo obtener el detalle de pagos"}}}
+export async function registrarPagoNexus(input:{clienteServicioId:string;monto:number;modalidad:"EFECTIVO"|"QR"|"TRANSFERENCIA";confirmado:boolean;notificado:boolean;observacion?:string}):Promise<ActionResult<void>>{try{await ensurePagos();const s=await auth.api.getSession({headers:await headers()});if(!s?.user?.id)return{success:false,error:"No autorizado"};const cs=await db.clienteServicio.findUnique({where:{id:input.clienteServicioId},select:{clienteId:true}});if(!cs)return{success:false,error:"Servicio no encontrado"};const monto=Number(input.monto);if(!Number.isFinite(monto)||monto<=0)return{success:false,error:"Ingresa un monto válido"};const resumen=await obtenerResumenPagoNexus(input.clienteServicioId);if(!resumen.success||!resumen.data)return{success:false,error:resumen.error||"No se pudo validar el saldo"};if(monto>resumen.data.saldo+.001)return{success:false,error:`El pago supera el saldo pendiente de ${resumen.data.saldo.toFixed(2)} Bs.`};await db.$executeRaw`INSERT INTO "cliente_servicio_pago_nexus" ("id","clienteServicioId","monto","modalidad","confirmado","notificado","observacion","usuarioId","createdAt") VALUES (${crypto.randomUUID()},${input.clienteServicioId},${monto},${input.modalidad},${input.confirmado},${input.notificado},${input.observacion?.trim()||null},${s.user.id},NOW())`;const nuevoAbonado=resumen.data.abonado+monto;const estados=await db.catalogoEstadoPago.findMany({where:{activo:true},select:{id:true,nombre:true}});const objetivo=nuevoAbonado>=resumen.data.total-.001?estados.find(e=>/pagado|cancelado/i.test(e.nombre)):estados.find(e=>/parcial|cuota|dos pagos/i.test(e.nombre));if(objetivo)await db.clienteServicio.update({where:{id:input.clienteServicioId},data:{estadoPagoId:objetivo.id}});await registrarAuditoriaNexus({accion:"PAGO REGISTRADO",entidad:"Pago",entidadId:input.clienteServicioId,clienteId:cs.clienteId,usuarioId:s.user.id,detalle:`${monto.toLocaleString("es-BO")} Bs. · ${input.modalidad} · ${input.confirmado?"Confirmado":"Por confirmar"}${input.notificado?" · Notificado":""}`});return{success:true}}catch(e){console.error(e);return{success:false,error:"No se pudo registrar el pago"}}}
+export async function obtenerFacturacionNexus(clienteServicioId:string):Promise<ActionResult<FacturacionNexus>>{try{await ensureFacturacion();const rows=await db.$queryRaw<Array<{solicitaFactura:boolean;nombreRazonSocial:string|null;nit:string|null;actualizadoPorNombre:string|null;updatedAt:Date}>>`SELECT f."solicitaFactura",f."nombreRazonSocial",f."nit",u."name" AS "actualizadoPorNombre",f."updatedAt" FROM "cliente_servicio_facturacion_nexus" f LEFT JOIN "user" u ON u."id"=f."actualizadoPorId" WHERE f."clienteServicioId"=${clienteServicioId} LIMIT 1`;const r=rows[0];return{success:true,data:r??{solicitaFactura:false,nombreRazonSocial:null,nit:null,actualizadoPorNombre:null,updatedAt:null}}}catch(e){console.error(e);return{success:false,error:"No se pudieron cargar datos de facturación"}}}
+export async function guardarFacturacionNexus(input:{clienteServicioId:string;solicitaFactura:boolean;nombreRazonSocial?:string|null;nit?:string|null}):Promise<ActionResult<void>>{try{await ensureFacturacion();const s=await auth.api.getSession({headers:await headers()});if(!s?.user?.id)return{success:false,error:"No autorizado"};const cs=await db.clienteServicio.findUnique({where:{id:input.clienteServicioId},select:{clienteId:true}});if(!cs)return{success:false,error:"Servicio no encontrado"};const nombre=input.nombreRazonSocial?.trim()||null;const nit=input.nit?.trim()||null;if(input.solicitaFactura&&(!nombre||!nit))return{success:false,error:"Para emitir factura registra Nombre/Razón Social y NIT"};await db.$executeRaw`INSERT INTO "cliente_servicio_facturacion_nexus" ("clienteServicioId","solicitaFactura","nombreRazonSocial","nit","actualizadoPorId","createdAt","updatedAt") VALUES (${input.clienteServicioId},${input.solicitaFactura},${input.solicitaFactura?nombre:null},${input.solicitaFactura?nit:null},${s.user.id},NOW(),NOW()) ON CONFLICT ("clienteServicioId") DO UPDATE SET "solicitaFactura"=EXCLUDED."solicitaFactura","nombreRazonSocial"=EXCLUDED."nombreRazonSocial","nit"=EXCLUDED."nit","actualizadoPorId"=EXCLUDED."actualizadoPorId","updatedAt"=NOW()`;await registrarAuditoriaNexus({accion:"FACTURACIÓN ACTUALIZADA",entidad:"Facturación",entidadId:input.clienteServicioId,clienteId:cs.clienteId,usuarioId:s.user.id,detalle:input.solicitaFactura?`Solicita factura · ${nombre} · NIT ${nit}`:"No solicita factura"});return{success:true}}catch(e){console.error(e);return{success:false,error:"No se pudieron guardar los datos de facturación"}}}

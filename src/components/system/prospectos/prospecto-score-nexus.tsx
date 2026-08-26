@@ -2,359 +2,38 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import {
-  AlertTriangle,
-  ArrowLeft,
-  CheckCircle2,
-  Lightbulb,
-  Loader2,
-  ShieldAlert,
-  Target,
-} from "lucide-react";
+import { AlertTriangle, ArrowLeft, CheckCircle2, Lightbulb, Loader2, ShieldAlert, Target } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
-type ScoreOption = {
-  value: string;
-  label: string;
-  factor: number;
-};
+type ScoreOption={value:string;label:string;factor:number;puntos?:number};
+type ScoreQuestion={id:string;titulo:string;ayuda:string;peso:number;opciones:ScoreOption[];tipo?:"BASE"|"PENALIDAD";multiple?:boolean;maxSelections?:number};
+type ScoreAnswers=Record<string,string|string[]>;
+type ScoreInsight={preguntaId:string;titulo:string;respuesta:string;aporte:number;peso:number};
+type ScoreAnalysis={prioridadComercial:"ALTA"|"MEDIA"|"BAJA";fortalezas:ScoreInsight[];alertas:ScoreInsight[];acciones:string[]};
+type ScoreEvaluation={id:string;score:number;clasificacion:string;modeloVersion:string;respuestas?:ScoreAnswers;evaluadorNombre?:string|null;createdAt?:string;analisis?:ScoreAnalysis|null};
+type ScorePayload={prospecto:{id:string;nombres:string;apellidos:string|null;scorePreliminar:number|null};modelo:{version:string;preguntas:ScoreQuestion[];aviso:string};ultimaEvaluacion:ScoreEvaluation|null;historial:ScoreEvaluation[]};
 
-type ScoreQuestion = {
-  id: string;
-  titulo: string;
-  ayuda: string;
-  peso: number;
-  opciones: ScoreOption[];
-};
+function labelClasificacion(value:string){const labels:Record<string,string>={ALTA_OPORTUNIDAD:"Alta oportunidad",MEDIA_OPORTUNIDAD:"Media oportunidad",BAJA_OPORTUNIDAD:"Baja oportunidad",ALTO:"Perfil alto",MEDIO_ALTO:"Perfil medio-alto",MEDIO:"Perfil medio",BAJO:"Perfil bajo"};return labels[value]??value}
+function labelPrioridad(value:ScoreAnalysis["prioridadComercial"]){return value==="ALTA"?"Alta":value==="MEDIA"?"Media":"Baja"}
 
-type ScoreInsight = {
-  preguntaId: string;
-  titulo: string;
-  respuesta: string;
-  aporte: number;
-  peso: number;
-};
-
-type ScoreAnalysis = {
-  prioridadComercial: "ALTA" | "MEDIA" | "BAJA";
-  fortalezas: ScoreInsight[];
-  alertas: ScoreInsight[];
-  acciones: string[];
-};
-
-type ScoreEvaluation = {
-  id: string;
-  score: number;
-  clasificacion: string;
-  modeloVersion: string;
-  respuestas?: Record<string, string>;
-  evaluadorNombre?: string | null;
-  createdAt?: string;
-  analisis?: ScoreAnalysis | null;
-};
-
-type ScorePayload = {
-  prospecto: {
-    id: string;
-    nombres: string;
-    apellidos: string | null;
-    scorePreliminar: number | null;
-  };
-  modelo: {
-    version: string;
-    preguntas: ScoreQuestion[];
-    aviso: string;
-  };
-  ultimaEvaluacion: ScoreEvaluation | null;
-  historial: ScoreEvaluation[];
-};
-
-function labelClasificacion(value: string) {
-  const labels: Record<string, string> = {
-    ALTO: "Perfil alto",
-    MEDIO_ALTO: "Perfil medio-alto",
-    MEDIO: "Perfil medio",
-    BAJO: "Perfil bajo",
-  };
-  return labels[value] ?? value;
-}
-
-function labelPrioridad(value: ScoreAnalysis["prioridadComercial"]) {
-  const labels = {
-    ALTA: "Alta",
-    MEDIA: "Media",
-    BAJA: "Baja",
-  };
-  return labels[value];
-}
-
-export function ProspectoScoreNexus({ prospectoId }: { prospectoId: string }) {
-  const router = useRouter();
-  const [data, setData] = useState<ScorePayload | null>(null);
-  const [respuestas, setRespuestas] = useState<Record<string, string>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState("");
-  const [resultado, setResultado] = useState<ScoreEvaluation | null>(null);
-
-  const load = async () => {
-    try {
-      setLoading(true);
-      setError("");
-      const response = await fetch(`/api/prospectos/${prospectoId}/score`, {
-        cache: "no-store",
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "No se pudo cargar el Score NEXUS");
-      setData(payload);
-      setResultado(payload.ultimaEvaluacion);
-
-      if (
-        payload.ultimaEvaluacion?.respuestas &&
-        payload.ultimaEvaluacion.modeloVersion === payload.modelo.version
-      ) {
-        setRespuestas(payload.ultimaEvaluacion.respuestas);
-      } else {
-        setRespuestas({});
-      }
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "No se pudo cargar el Score NEXUS");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-  }, [prospectoId]);
-
-  const guardar = async () => {
-    if (!data) return;
-    const faltantes = data.modelo.preguntas.filter((pregunta) => !respuestas[pregunta.id]);
-    if (faltantes.length > 0) {
-      setError(`Faltan ${faltantes.length} respuesta(s) antes de calcular el Score.`);
-      return;
-    }
-
-    try {
-      setSaving(true);
-      setError("");
-      const response = await fetch(`/api/prospectos/${prospectoId}/score`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ respuestas }),
-      });
-      const payload = await response.json();
-      if (!response.ok) throw new Error(payload.error || "No se pudo guardar la evaluación");
-      setResultado(payload.evaluacion);
-      await load();
-    } catch (err) {
-      console.error(err);
-      setError(err instanceof Error ? err.message : "No se pudo guardar la evaluación");
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  if (loading) {
-    return (
-      <div className="flex-1 p-8 pt-6">
-        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Loader2 className="h-4 w-4 animate-spin" /> Cargando Score NEXUS...
-        </div>
-      </div>
-    );
-  }
-
-  if (!data) {
-    return (
-      <div className="flex-1 space-y-4 p-8 pt-6">
-        <Button variant="outline" onClick={() => router.push(`/prospectos/${prospectoId}`)}>
-          <ArrowLeft className="mr-2 h-4 w-4" /> Volver al prospecto
-        </Button>
-        <p className="text-sm text-destructive">{error || "No se pudo cargar la evaluación"}</p>
-      </div>
-    );
-  }
-
-  const modeloCambio = resultado && resultado.modeloVersion !== data.modelo.version;
-  const analisis =
-    resultado?.modeloVersion === data.modelo.version ? resultado.analisis : null;
-
-  return (
-    <div className="flex-1 space-y-6 p-8 pt-6">
-      <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
-        <div>
-          <Button variant="outline" className="mb-4" onClick={() => router.push(`/prospectos/${prospectoId}`)}>
-            <ArrowLeft className="mr-2 h-4 w-4" /> Volver al prospecto
-          </Button>
-          <h2 className="text-3xl font-bold tracking-tight">Score NEXUS</h2>
-          <p className="text-muted-foreground">
-            {data.prospecto.nombres} {data.prospecto.apellidos ?? ""}
-          </p>
-        </div>
-
-        {resultado && (
-          <Card className="min-w-[240px]">
-            <CardContent className="pt-5">
-              <p className="text-xs uppercase tracking-widest text-muted-foreground">Último Score</p>
-              <div className="mt-1 flex items-end gap-2">
-                <span className="text-4xl font-bold">{resultado.score}%</span>
-                <span className="pb-1 text-sm text-muted-foreground">{labelClasificacion(resultado.clasificacion)}</span>
-              </div>
-              <p className="mt-1 text-xs text-muted-foreground">{resultado.modeloVersion}</p>
-              {analisis && (
-                <p className="mt-2 text-sm font-medium">
-                  Prioridad de seguimiento: {labelPrioridad(analisis.prioridadComercial)}
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        )}
-      </div>
-
-      <Card>
-        <CardContent className="flex gap-3 pt-5 text-sm">
-          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground" />
-          <div>
-            <p className="font-medium">Índice interno orientativo</p>
-            <p className="text-muted-foreground">{data.modelo.aviso}</p>
-            <p className="mt-1 text-xs text-muted-foreground">Modelo actual: {data.modelo.version}</p>
-            {modeloCambio && (
-              <p className="mt-2 font-medium">
-                Hay una versión nueva del modelo. La evaluación anterior permanece en el historial y esta versión se responde desde cero para mantener la comparación limpia.
-              </p>
-            )}
-          </div>
-        </CardContent>
-      </Card>
-
-      {analisis && (
-        <div className="grid gap-4 lg:grid-cols-3">
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <CheckCircle2 className="h-5 w-5" /> Fortalezas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {analisis.fortalezas.length > 0 ? (
-                analisis.fortalezas.map((item) => (
-                  <div key={item.preguntaId}>
-                    <p className="font-medium">{item.titulo}</p>
-                    <p className="text-muted-foreground">{item.respuesta}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-muted-foreground">Todavía no se identifican fortalezas claras en esta evaluación.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <AlertTriangle className="h-5 w-5" /> Alertas
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {analisis.alertas.length > 0 ? (
-                analisis.alertas.map((item) => (
-                  <div key={item.preguntaId}>
-                    <p className="font-medium">{item.titulo}</p>
-                    <p className="text-muted-foreground">{item.respuesta}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-muted-foreground">No hay alertas principales en las respuestas actuales.</p>
-              )}
-            </CardContent>
-          </Card>
-
-          <Card>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Lightbulb className="h-5 w-5" /> Próximas acciones
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-3 text-sm">
-              {analisis.acciones.length > 0 ? (
-                analisis.acciones.map((accion, index) => (
-                  <div key={`${index}-${accion}`} className="flex gap-2">
-                    <Target className="mt-0.5 h-4 w-4 shrink-0" />
-                    <p>{accion}</p>
-                  </div>
-                ))
-              ) : (
-                <p className="text-muted-foreground">Mantener la información actualizada y validar cambios antes de una nueva evaluación.</p>
-              )}
-            </CardContent>
-          </Card>
-        </div>
-      )}
-
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
-      <div className="space-y-4">
-        {data.modelo.preguntas.map((pregunta, index) => (
-          <Card key={pregunta.id}>
-            <CardHeader>
-              <CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base">
-                <span>{index + 1}. {pregunta.titulo}</span>
-                <span className="text-xs font-normal text-muted-foreground">Peso: {pregunta.peso}%</span>
-              </CardTitle>
-              <p className="text-sm text-muted-foreground">{pregunta.ayuda}</p>
-            </CardHeader>
-            <CardContent>
-              <div className="grid gap-2">
-                {pregunta.opciones.map((opcion) => {
-                  const selected = respuestas[pregunta.id] === opcion.value;
-                  return (
-                    <button
-                      type="button"
-                      key={opcion.value}
-                      onClick={() => setRespuestas((current) => ({ ...current, [pregunta.id]: opcion.value }))}
-                      className={`flex w-full items-center justify-between rounded-lg border p-3 text-left text-sm transition-colors ${selected ? "border-primary bg-primary/5" : "hover:bg-muted/50"}`}
-                    >
-                      <span>{opcion.label}</span>
-                      {selected && <CheckCircle2 className="h-4 w-4 text-primary" />}
-                    </button>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
-
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4">
-        <div>
-          <p className="font-medium">Guardar evaluación</p>
-          <p className="text-sm text-muted-foreground">Se conservarán las respuestas, la versión del modelo, fecha y evaluador.</p>
-        </div>
-        <Button onClick={guardar} disabled={saving}>
-          {saving ? <><Loader2 className="mr-2 h-4 w-4 animate-spin" /> Guardando...</> : "Calcular y guardar Score"}
-        </Button>
-      </div>
-
-      {data.historial.length > 0 && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">Historial de evaluaciones</CardTitle></CardHeader>
-          <CardContent className="space-y-2 text-sm">
-            {data.historial.map((item) => (
-              <div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3">
-                <div>
-                  <p className="font-medium">{item.score}% · {labelClasificacion(item.clasificacion)}</p>
-                  <p className="text-xs text-muted-foreground">{item.evaluadorNombre || "Evaluador no disponible"} · {item.modeloVersion}</p>
-                </div>
-                {item.createdAt && <span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("es-BO")}</span>}
-              </div>
-            ))}
-          </CardContent>
-        </Card>
-      )}
-    </div>
-  );
+export function ProspectoScoreNexus({prospectoId}:{prospectoId:string}){
+ const router=useRouter();
+ const[data,setData]=useState<ScorePayload|null>(null),[respuestas,setRespuestas]=useState<ScoreAnswers>({}),[loading,setLoading]=useState(true),[saving,setSaving]=useState(false),[error,setError]=useState(""),[resultado,setResultado]=useState<ScoreEvaluation|null>(null);
+ const load=async()=>{try{setLoading(true);setError("");const response=await fetch(`/api/prospectos/${prospectoId}/score`,{cache:"no-store"});const payload=await response.json();if(!response.ok)throw new Error(payload.error||"No se pudo cargar el Score NEXUS");setData(payload);setResultado(payload.ultimaEvaluacion);if(payload.ultimaEvaluacion?.respuestas&&payload.ultimaEvaluacion.modeloVersion===payload.modelo.version)setRespuestas(payload.ultimaEvaluacion.respuestas);else setRespuestas({})}catch(err){console.error(err);setError(err instanceof Error?err.message:"No se pudo cargar el Score NEXUS")}finally{setLoading(false)}};
+ useEffect(()=>{void load()},[prospectoId]);
+ const seleccionar=(pregunta:ScoreQuestion,opcion:string)=>{if(!pregunta.multiple){setRespuestas(current=>({...current,[pregunta.id]:opcion}));setError("");return}setRespuestas(current=>{const actuales=Array.isArray(current[pregunta.id])?current[pregunta.id] as string[]:[];if(opcion==="sin_antecedentes")return{...current,[pregunta.id]:[opcion]};const sinSin=actuales.filter(v=>v!=="sin_antecedentes");if(sinSin.includes(opcion))return{...current,[pregunta.id]:sinSin.filter(v=>v!==opcion)};if(sinSin.length>=(pregunta.maxSelections??2)){setError(`En ANTECEDENTES puedes seleccionar máximo ${pregunta.maxSelections??2} opciones.`);return current}setError("");return{...current,[pregunta.id]:[...sinSin,opcion]}})};
+ const guardar=async()=>{if(!data)return;const faltantes=data.modelo.preguntas.filter(p=>{const r=respuestas[p.id];return Array.isArray(r)?r.length===0:!r});if(faltantes.length){setError(`Faltan ${faltantes.length} respuesta(s) antes de calcular el Score.`);return}try{setSaving(true);setError("");const response=await fetch(`/api/prospectos/${prospectoId}/score`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({respuestas})});const payload=await response.json();if(!response.ok)throw new Error(payload.error||"No se pudo guardar la evaluación");setResultado(payload.evaluacion);await load()}catch(err){console.error(err);setError(err instanceof Error?err.message:"No se pudo guardar la evaluación")}finally{setSaving(false)}};
+ if(loading)return <div className="flex-1 p-8 pt-6"><div className="flex items-center gap-2 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin"/>Cargando NEXUS Score...</div></div>;
+ if(!data)return <div className="flex-1 space-y-4 p-8 pt-6"><Button variant="outline" onClick={()=>router.push(`/prospectos/${prospectoId}`)}><ArrowLeft className="mr-2 h-4 w-4"/>Volver al prospecto</Button><p className="text-sm text-destructive">{error||"No se pudo cargar la evaluación"}</p></div>;
+ const modeloCambio=resultado&&resultado.modeloVersion!==data.modelo.version;const analisis=resultado?.modeloVersion===data.modelo.version?resultado.analisis:null;
+ return <div className="flex-1 space-y-6 p-8 pt-6">
+  <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between"><div><Button variant="outline" className="mb-4" onClick={()=>router.push(`/prospectos/${prospectoId}`)}><ArrowLeft className="mr-2 h-4 w-4"/>Volver al prospecto</Button><h2 className="text-3xl font-bold tracking-tight">NEXUS Score 2.2</h2><p className="text-muted-foreground">{data.prospecto.nombres} {data.prospecto.apellidos??""}</p></div>{resultado&&<Card className="min-w-[260px]"><CardContent className="pt-5"><p className="text-xs uppercase tracking-widest text-muted-foreground">Oportunidad comercial</p><div className="mt-1 flex items-end gap-2"><span className="text-4xl font-bold">{resultado.score}</span><span className="pb-1 text-sm text-muted-foreground">/100 pts</span></div><p className="mt-1 font-medium">{labelClasificacion(resultado.clasificacion)}</p><p className="mt-1 text-xs text-muted-foreground">{resultado.modeloVersion}</p>{analisis&&<p className="mt-2 text-sm font-medium">Prioridad de seguimiento: {labelPrioridad(analisis.prioridadComercial)}</p>}</CardContent></Card>}</div>
+  <Card><CardContent className="flex gap-3 pt-5 text-sm"><ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-muted-foreground"/><div><p className="font-medium">Método GO USA 2027 · índice interno</p><p className="text-muted-foreground">{data.modelo.aviso}</p><p className="mt-1 text-xs text-muted-foreground">Modelo actual: {data.modelo.version}</p>{modeloCambio&&<p className="mt-2 font-medium">Existe una versión nueva. La evaluación anterior permanece en historial y esta versión debe responderse nuevamente.</p>}</div></CardContent></Card>
+  {analisis&&<div className="grid gap-4 lg:grid-cols-3"><Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><CheckCircle2 className="h-5 w-5"/>Fortalezas operativas</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">{analisis.fortalezas.length?analisis.fortalezas.map((i,index)=><div key={`${i.preguntaId}-${index}`}><p className="font-medium">{i.titulo}</p><p className="text-muted-foreground">{i.respuesta} · {i.aporte} pts</p></div>):<p className="text-muted-foreground">Todavía no se identifican fortalezas claras.</p>}</CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><AlertTriangle className="h-5 w-5"/>Alertas a revisar</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">{analisis.alertas.length?analisis.alertas.map((i,index)=><div key={`${i.preguntaId}-${index}`}><p className="font-medium">{i.titulo}</p><p className="text-muted-foreground">{i.respuesta} · {i.aporte} pts</p></div>):<p className="text-muted-foreground">No hay alertas principales en esta evaluación.</p>}</CardContent></Card><Card><CardHeader><CardTitle className="flex items-center gap-2 text-base"><Lightbulb className="h-5 w-5"/>Próximas acciones</CardTitle></CardHeader><CardContent className="space-y-3 text-sm">{analisis.acciones.length?analisis.acciones.map((a,index)=><div key={`${index}-${a}`} className="flex gap-2"><Target className="mt-0.5 h-4 w-4 shrink-0"/><p>{a}</p></div>):<p className="text-muted-foreground">Mantener la información actualizada antes de una nueva evaluación.</p>}</CardContent></Card></div>}
+  {error&&<p className="text-sm text-destructive">{error}</p>}
+  <div className="space-y-4">{data.modelo.preguntas.map((pregunta,index)=><Card key={pregunta.id} className={pregunta.tipo==="PENALIDAD"?"border-amber-200 bg-amber-50/30":""}><CardHeader><CardTitle className="flex flex-wrap items-center justify-between gap-2 text-base"><span>{index+1}. {pregunta.titulo}</span>{pregunta.tipo!=="PENALIDAD"&&<span className="text-xs font-normal text-muted-foreground">Bloque máximo: {pregunta.peso} pts</span>}</CardTitle><p className="text-sm text-muted-foreground">{pregunta.ayuda}</p>{pregunta.multiple&&<p className="text-xs font-semibold text-amber-700">Máximo {pregunta.maxSelections??2} opciones. “Sin antecedentes” es excluyente.</p>}</CardHeader><CardContent><div className="grid gap-2">{pregunta.opciones.map(opcion=>{const actual=respuestas[pregunta.id];const selected=Array.isArray(actual)?actual.includes(opcion.value):actual===opcion.value;return <button type="button" key={opcion.value} onClick={()=>seleccionar(pregunta,opcion.value)} className={`flex w-full items-center justify-between gap-3 rounded-lg border p-3 text-left text-sm transition-colors ${selected?pregunta.tipo==="PENALIDAD"?"border-amber-600 bg-amber-50":"border-primary bg-primary/5":"hover:bg-muted/50"}`}><span>{opcion.label}</span><span className="flex shrink-0 items-center gap-2"><span className={`text-xs ${pregunta.tipo==="PENALIDAD"&&Number(opcion.puntos)<0?"font-semibold text-red-600":"text-muted-foreground"}`}>{opcion.puntos??Math.round(pregunta.peso*opcion.factor)} pts</span>{selected&&<CheckCircle2 className="h-4 w-4 text-primary"/>}</span></button>})}</div></CardContent></Card>)}</div>
+  <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-4"><div><p className="font-medium">Guardar evaluación</p><p className="text-sm text-muted-foreground">NEXUS conservará los 9 bloques base, antecedentes, versión, fecha y evaluador.</p></div><Button onClick={guardar} disabled={saving}>{saving?<><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Guardando...</>:"Calcular y guardar Score 2.2"}</Button></div>
+  {data.historial.length>0&&<Card><CardHeader><CardTitle className="text-base">Historial de evaluaciones</CardTitle></CardHeader><CardContent className="space-y-2 text-sm">{data.historial.map(item=><div key={item.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-3"><div><p className="font-medium">{item.score}/100 · {labelClasificacion(item.clasificacion)}</p><p className="text-xs text-muted-foreground">{item.evaluadorNombre||"Evaluador no disponible"} · {item.modeloVersion}</p></div>{item.createdAt&&<span className="text-xs text-muted-foreground">{new Date(item.createdAt).toLocaleString("es-BO")}</span>}</div>)}</CardContent></Card>}
+ </div>
 }

@@ -1,268 +1,92 @@
-export const PROSPECTO_SCORE_VERSION = "NEXUS-PROSPECTO-0.2";
+export const PROSPECTO_SCORE_VERSION = "NEXUS-SCORE-2.3-GOUSA-2027";
 
-export type ScoreOption = {
-  value: string;
-  label: string;
-  factor: number;
-};
+export type ScoreOption = { value:string; label:string; factor:number; puntos:number };
+export type ScoreQuestion = { id:string; titulo:string; ayuda:string; peso:number; opciones:ScoreOption[]; tipo?:"BASE"|"PENALIDAD"; multiple?:boolean; maxSelections?:number };
+export type ProspectoScoreAnswers = Record<string,string|string[]>;
+export type ProspectoScoreInsight = { preguntaId:string; titulo:string; respuesta:string; aporte:number; peso:number };
+export type ProspectoScoreAnalysis = { prioridadComercial:"ALTA"|"MEDIA"|"BAJA"; fortalezas:ProspectoScoreInsight[]; alertas:ProspectoScoreInsight[]; acciones:string[] };
 
-export type ScoreQuestion = {
-  id: string;
-  titulo: string;
-  ayuda: string;
-  peso: number;
-  opciones: ScoreOption[];
-};
+function opcion(value:string,label:string,puntos:number,peso:number):ScoreOption{return{value,label,puntos,factor:peso===0?(puntos<0?-1:1):puntos/peso}}
 
-export type ProspectoScoreAnswers = Record<string, string>;
-
-export type ProspectoScoreInsight = {
-  preguntaId: string;
-  titulo: string;
-  respuesta: string;
-  aporte: number;
-  peso: number;
-};
-
-export type ProspectoScoreAnalysis = {
-  prioridadComercial: "ALTA" | "MEDIA" | "BAJA";
-  fortalezas: ProspectoScoreInsight[];
-  alertas: ProspectoScoreInsight[];
-  acciones: string[];
-};
-
-/**
- * Score NEXUS interno para prospectos de visa temporal B1/B2.
- *
- * No intenta predecir una decisión consular. La ponderación prioriza señales
- * operativas alineadas con propósito temporal, intención de salida, vínculos
- * fuera de EE.UU., capacidad de cubrir el viaje, elegibilidad para la categoría
- * y consistencia de la información.
- *
- * No usa edad, sexo, raza, religión, discapacidad, estado civil u otras
- * características protegidas como criterios de puntuación.
- */
-export const PROSPECTO_SCORE_QUESTIONS: ScoreQuestion[] = [
-  {
-    id: "proposito_categoria",
-    titulo: "Propósito del viaje y encaje con visa temporal",
-    ayuda:
-      "Evalúa si el motivo declarado es específico, temporal y compatible con una visita de negocios o turismo, sin asumir que eso garantiza elegibilidad.",
-    peso: 14,
-    opciones: [
-      { value: "claro_compatible", label: "Propósito claro, temporal y coherente con la categoría", factor: 1 },
-      { value: "claro_revisar", label: "Propósito entendible, pero requiere precisar actividades o categoría", factor: 0.6 },
-      { value: "ambiguo", label: "Propósito ambiguo o con actividades que deben revisarse antes de avanzar", factor: 0.15 },
-    ],
-  },
-  {
-    id: "plan_temporal",
-    titulo: "Plan, duración y lógica del viaje",
-    ayuda:
-      "Considera si duración, destino, actividades y fechas tentativas forman un plan temporal razonablemente coherente.",
-    peso: 8,
-    opciones: [
-      { value: "coherente", label: "Plan definido y coherente con el motivo", factor: 1 },
-      { value: "parcial", label: "Plan general definido, con detalles pendientes", factor: 0.6 },
-      { value: "inconsistente", label: "Duración o actividades todavía no son coherentes", factor: 0.15 },
-    ],
-  },
-  {
-    id: "vinculos_retorno",
-    titulo: "Vínculos y compromisos objetivos de retorno",
-    ayuda:
-      "Considera compromisos verificables fuera de EE.UU., como trabajo, negocio, estudios, vivienda, responsabilidades económicas o personales. No puntúa el tipo de familia ni el estado civil.",
-    peso: 20,
-    opciones: [
-      { value: "multiples", label: "Existen varios compromisos claros, actuales y verificables", factor: 1 },
-      { value: "uno_solido", label: "Existe al menos un compromiso importante y verificable", factor: 0.7 },
-      { value: "limitados", label: "Los compromisos existen, pero son débiles o poco documentados", factor: 0.35 },
-      { value: "sin_evidencia", label: "Todavía no se identifican compromisos objetivos verificables", factor: 0 },
-    ],
-  },
-  {
-    id: "continuidad_actividad",
-    titulo: "Continuidad laboral, empresarial o académica",
-    ayuda:
-      "Mide estabilidad y posibilidad de verificación de la actividad actual, sin asignar valor por profesión, cargo o nivel educativo.",
-    peso: 12,
-    opciones: [
-      { value: "estable", label: "Actividad estable y verificable por 12 meses o más", factor: 1 },
-      { value: "consolidando", label: "Actividad verificable entre 3 y 12 meses", factor: 0.7 },
-      { value: "reciente", label: "Actividad reciente o documentación aún incompleta", factor: 0.4 },
-      { value: "no_aplica_documentado", label: "No tiene actividad actual, pero la situación está claramente explicada y documentada", factor: 0.45 },
-      { value: "sin_datos", label: "No hay información suficiente para verificar la situación actual", factor: 0.1 },
-    ],
-  },
-  {
-    id: "capacidad_costos",
-    titulo: "Capacidad para cubrir los costos del viaje",
-    ayuda:
-      "Evalúa si el presupuesto del viaje puede explicarse y respaldarse, ya sea con recursos propios o con apoyo de un tercero claramente documentado.",
-    peso: 12,
-    opciones: [
-      { value: "propios_suficientes", label: "Recursos propios suficientes y coherentes con el viaje", factor: 1 },
-      { value: "tercero_documentado", label: "Parte o todo será cubierto por un tercero y el apoyo está claramente documentado", factor: 0.85 },
-      { value: "parcial", label: "Hay recursos, pero falta sustento o el presupuesto requiere ajuste", factor: 0.45 },
-      { value: "sin_respaldo", label: "Todavía no existe un respaldo económico identificable", factor: 0.05 },
-    ],
-  },
-  {
-    id: "consistencia_global",
-    titulo: "Consistencia entre historia, formulario y documentos",
-    ayuda:
-      "Compara lo declarado sobre viaje, actividad, recursos y antecedentes para identificar contradicciones materiales o vacíos que deben corregirse.",
-    peso: 12,
-    opciones: [
-      { value: "consistente", label: "La información es consistente y los respaldos principales coinciden", factor: 1 },
-      { value: "vacíos_menores", label: "Hay vacíos menores corregibles sin cambiar la historia principal", factor: 0.7 },
-      { value: "inconsistencias", label: "Hay inconsistencias relevantes que deben resolverse antes de avanzar", factor: 0.2 },
-    ],
-  },
-  {
-    id: "cumplimiento_migratorio",
-    titulo: "Antecedentes de cumplimiento migratorio",
-    ayuda:
-      "Revisa sobreestadías, trabajo no autorizado, remoción, fraude u otros antecedentes relevantes. No tener viajes previos no reduce el puntaje.",
-    peso: 10,
-    opciones: [
-      { value: "sin_incidentes", label: "No se conocen incidentes migratorios relevantes", factor: 1 },
-      { value: "sin_historial", label: "No tiene historial migratorio previo que evaluar", factor: 1 },
-      { value: "incidente_resuelto", label: "Existe un antecedente, pero está identificado y requiere análisis específico", factor: 0.45 },
-      { value: "riesgo_legal", label: "Existe un posible impedimento o antecedente serio que requiere revisión profesional antes de continuar", factor: 0 },
-    ],
-  },
-  {
-    id: "rechazos_cambios",
-    titulo: "Rechazos previos y cambios de circunstancias",
-    ayuda:
-      "Un rechazo previo no descalifica automáticamente. Si existió uno, evalúa si se comprende la razón y si hay cambios relevantes o mejor evidencia desde entonces.",
-    peso: 5,
-    opciones: [
-      { value: "sin_rechazo", label: "No registra rechazo previo conocido", factor: 1 },
-      { value: "rechazo_con_cambios", label: "Hubo rechazo previo y existen cambios o nueva evidencia relevante", factor: 0.8 },
-      { value: "rechazo_sin_cambios", label: "Hubo rechazo previo y las circunstancias relevantes siguen prácticamente iguales", factor: 0.35 },
-      { value: "motivo_desconocido", label: "Hubo rechazo, pero todavía no se conoce o entiende suficientemente el motivo", factor: 0.2 },
-    ],
-  },
-  {
-    id: "preparacion_entrevista",
-    titulo: "Preparación para explicar el caso con claridad",
-    ayuda:
-      "Evalúa si el prospecto puede explicar de forma breve y consistente el propósito, duración, financiamiento y razones de retorno, sin memorizar respuestas artificiales.",
-    peso: 7,
-    opciones: [
-      { value: "preparado", label: "Responde con claridad, naturalidad y consistencia", factor: 1 },
-      { value: "requiere_practica", label: "La historia es consistente, pero necesita práctica y mejor estructura", factor: 0.65 },
-      { value: "confuso", label: "Las respuestas son confusas o cambian al repreguntar", factor: 0.2 },
-    ],
-  },
+export const PROSPECTO_SCORE_QUESTIONS:ScoreQuestion[]=[
+ {id:"estado_civil",titulo:"Estado civil declarado",ayuda:"Registrar la situación actual tal como fue informada por el prospecto.",peso:10,tipo:"BASE",opciones:[opcion("soltero","Soltero(a)",4,10),opcion("casado","Casado(a)",10,10),opcion("divorciado","Divorciado(a)",6,10),opcion("conviviente","Conviviente",8,10)]},
+ {id:"hijos",titulo:"Situación de hijos",ayuda:"Seleccionar la alternativa que mejor representa la situación familiar declarada.",peso:5,tipo:"BASE",opciones:[opcion("dependientes","Con hijos dependientes",5,5),opcion("independientes","Con hijos independientes",4,5),opcion("sin_hijos","Sin hijos",1,5)]},
+ {id:"situacion_laboral",titulo:"Situación laboral principal",ayuda:"Seleccionar una sola alternativa principal.",peso:15,tipo:"BASE",opciones:[
+   opcion("dependiente_privada_5","Dependiente empresa privada +5 años",10,15),
+   opcion("dependiente_publica_5","Dependiente empresa pública +5 años",15,15),
+   opcion("dependiente_menos_2_gestora","Dependiente hace menos de 2 años pero aporta a Gestora",5,15),
+   opcion("independiente_nit_menos_2_movimiento","Independiente con NIT menos de 2 años y movimiento",10,15),
+   opcion("independiente_nit_5","Independiente con NIT +5 años",15,15),
+   opcion("independiente_sin_respaldo","Independiente sin respaldo",5,15),
+   opcion("independiente_sin_nit_buenas_transacciones","Independiente sin NIT pero con buenas transacciones",10,15),
+   opcion("sin_trabajo_renta","Sin trabajo, con renta/propiedades",12,15),
+   opcion("sin_trabajo_patrocinante","Sin trabajo, con patrocinante",8,15),
+   opcion("sin_trabajo_sin_patrocinante","Sin trabajo y sin patrocinante",-10,15)
+ ]},
+ {id:"antiguedad_laboral",titulo:"Antigüedad / estabilidad laboral",ayuda:"Aplicar a la actividad laboral, empresarial o económica principal cuando corresponda.",peso:15,tipo:"BASE",opciones:[
+   opcion("menos_1","Menos de 1 año",4,15),
+   opcion("1_2","Estable entre 1 a 2 años",6,15),
+   opcion("3_5","Estable entre 3 a 5 años",10,15),
+   opcion("mas_5","Estable más de 5 años",15,15),
+   opcion("no_aplica_invitacion_dependiente","No aplica: viaja con invitación o como dependiente de alguien",13,15)
+ ]},
+ {id:"ingresos",titulo:"Percepción salarial / ingresos mensuales",ayuda:"Usar el ingreso mensual principal declarado y respaldable.",peso:15,tipo:"BASE",opciones:[opcion("hasta_3300","Bs 3.300 o menos",2,15),opcion("3300_6000","Bs 3.300 a Bs 6.000",4,15),opcion("6000_9999","Bs 6.000 a Bs 9.999",9,15),opcion("10000_19999","Bs 10.000 a Bs 19.999",12,15),opcion("20000_mas","Bs 20.000 o más",15,15)]},
+ {id:"vivienda",titulo:"Vivienda / estabilidad residencial",ayuda:"Seleccionar la condición residencial principal.",peso:10,tipo:"BASE",opciones:[
+   opcion("propiedad","Propiedad inmueble a su nombre",10,10),
+   opcion("anticretico","Anticrético",7,10),
+   opcion("alquiler_menor_2500","Alquiler hasta Bs 2.500",3,10),
+   opcion("alquiler_3000_mas","Alquiler Bs 3.000 o más",5,10),
+   opcion("vive_padres","Vive con padres",4,10)
+ ]},
+ {id:"solidez_financiera",titulo:"Principal señal patrimonial / financiera",ayuda:"Elegir la señal que mejor represente la situación actual.",peso:10,tipo:"BASE",opciones:[
+   opcion("otro_patrimonio","Otro patrimonio a su nombre",7,10),
+   opcion("cuentas_bancarias","Cuentas bancarias con ahorro/movimiento",10,10),
+   opcion("efectivo_ahorrado","Dinero en efectivo ahorrado",6,10),
+   opcion("deuda_alta_productiva","Deuda bancaria alta vinculada a negocio/propiedad",10,10),
+   opcion("deuda_mediana_baja","Deuda bancaria mediana o baja",5,10),
+   opcion("sin_deuda_sin_bienes","Sin deuda pero sin bienes",-6,10)
+ ]},
+ {id:"entorno_usa",titulo:"Contexto de viaje / vínculos en Estados Unidos",ayuda:"Registrar la situación que mejor describa el contexto principal del viaje.",peso:10,tipo:"BASE",opciones:[
+   opcion("familiar_ciudadano","Familiar de primer grado ciudadano estadounidense",8,10),
+   opcion("evento_feria","Invitación a evento o feria en Estados Unidos",10,10),
+   opcion("amistad_legal","Amistad o conocido en USA con estatus legal, ciudadano o residente estable",7,10),
+   opcion("sin_conocido_respaldo","Sin ningún conocido en USA pero con respaldos",10,10),
+   opcion("motivo_no_claro","No tiene claro el motivo de viaje",0,10),
+   opcion("familiar_directo_irregular","Familiar directo en USA con situación migratoria irregular",-16,10)
+ ]},
+ {id:"historial_viajes",titulo:"Historial de viajes al exterior",ayuda:"Seleccionar la alternativa que mejor resuma el historial internacional declarado.",peso:10,tipo:"BASE",opciones:[
+   opcion("mas_3_fuera_fronteras","Más de 3 países fuera de fronteras visitados en los últimos años",10,10),
+   opcion("al_menos_2_fronterizos_5","Al menos 2 países visitados (fronterizos) en los últimos 5 años",6,10),
+   opcion("mas_5_historicos","Más de 5 países visitados, pero de forma histórica",6,10),
+   opcion("ninguno_laboral","Ningún viaje al exterior por temas laborales",6,10),
+   opcion("ninguno_falta_interes","Ningún viaje al exterior por falta de interés",2,10)
+ ]},
+ {id:"antecedentes",titulo:"ANTECEDENTES",ayuda:"Selecciona hasta 2 antecedentes relevantes. Si no corresponde ninguno, marca “Sin antecedentes”.",peso:0,tipo:"PENALIDAD",multiple:true,maxSelections:2,opciones:[
+   opcion("deportacion_menos_20","Deportación / remoción de EE.UU. hace menos de 20 años",-25,0),
+   opcion("estadia_menos_2","Estadía irregular en EE.UU. · salió hace menos de 2 años",-25,0),
+   opcion("estadia_aprox_5","Estadía irregular en EE.UU. · salió hace aproximadamente 5 años",-20,0),
+   opcion("estadia_5_10","Estadía irregular en EE.UU. · salió hace 5 a 10 años",-15,0),
+   opcion("estadia_mas_10","Estadía irregular en EE.UU. · salió hace más de 10 años",-10,0),
+   opcion("estadia_mas_10_estable","Estadía irregular en EE.UU. · salió hace más de 10 años y hoy su situación es estable",-3,0),
+   opcion("negacion_usa_menos_1_sin_cambios","Negación previa de visa USA · menos de 1 año y sin cambios",-15,0),
+   opcion("negacion_usa_2_5_con_cambios","Negación previa de visa USA · hace 2 a 5 años y existen cambios",-6,0),
+   opcion("negacion_usa_mas_5_con_cambios","Negación previa de visa USA · hace más de 5 años y existen cambios",-3,0),
+   opcion("negacion_otro_ultimos_5","Negación de visa de otro país · últimos 5 años",-5,0),
+   opcion("negacion_otro_mas_5","Negación de visa de otro país · hace más de 5 años",-2,0),
+   opcion("vivio_otro_pais_reciente","Vivió/migró en otro país · actualmente o recientemente",-10,0),
+   opcion("antecedente_usa_antiguo","Otro antecedente en USA · antecedente antiguo",-3,0),
+   opcion("detencion_antecedente","Otro antecedente en USA · incluyó detención y antecedente",-22,0),
+   opcion("fianza_sin_problema","Otro antecedente en USA · tuvo pago de fianza y no hubo otro problema declarado",-10,0),
+   opcion("sin_antecedentes","Sin antecedentes",0,0)
+ ]}
 ];
 
-export function calcularProspectoScore(respuestas: ProspectoScoreAnswers) {
-  let score = 0;
+function selectedOptions(pregunta:ScoreQuestion,respuesta:string|string[]|undefined){const values=Array.isArray(respuesta)?respuesta:[respuesta].filter(Boolean) as string[];return values.map(value=>pregunta.opciones.find(o=>o.value===value)).filter((o):o is ScoreOption=>Boolean(o))}
 
-  for (const pregunta of PROSPECTO_SCORE_QUESTIONS) {
-    const respuesta = respuestas[pregunta.id];
-    const opcion = pregunta.opciones.find((item) => item.value === respuesta);
+export function calcularProspectoScore(respuestas:ProspectoScoreAnswers){let score=0;for(const pregunta of PROSPECTO_SCORE_QUESTIONS){const seleccionadas=selectedOptions(pregunta,respuestas[pregunta.id]);if(!seleccionadas.length)throw new Error(`Respuesta inválida para ${pregunta.id}`);score+=seleccionadas.reduce((total,item)=>total+item.puntos,0)}const scoreNormalizado=Math.max(0,Math.min(100,Math.round(score)));return{score:scoreNormalizado,clasificacion:clasificarProspectoScore(scoreNormalizado)}}
 
-    if (!opcion) {
-      throw new Error(`Respuesta inválida para ${pregunta.id}`);
-    }
+export function analizarProspectoScore(respuestas:ProspectoScoreAnswers):ProspectoScoreAnalysis{const items=PROSPECTO_SCORE_QUESTIONS.flatMap(p=>selectedOptions(p,respuestas[p.id]).map(s=>({preguntaId:p.id,titulo:p.titulo,respuesta:s.label,aporte:s.puntos,peso:p.peso,factor:s.factor,tipo:p.tipo})));const fortalezas=items.filter(i=>i.tipo!=="PENALIDAD"&&i.factor>=.75).sort((a,b)=>b.aporte-a.aporte).slice(0,4).map(({factor:_f,tipo:_t,...i})=>i);const alertas=items.filter(i=>i.aporte<0).sort((a,b)=>a.aporte-b.aporte).slice(0,6).map(({factor:_f,tipo:_t,...i})=>i);const acciones=alertas.map(a=>a.tipo==="PENALIDAD"?`Revisar antecedente migratorio antes de avanzar: ${a.respuesta}.`:`Revisar: ${a.titulo}.`);const{score}=calcularProspectoScore(respuestas);const prioridadComercial=score>=70?"ALTA":score>=45?"MEDIA":"BAJA";return{prioridadComercial,fortalezas,alertas,acciones:[...new Set(acciones)].slice(0,6)} as ProspectoScoreAnalysis}
 
-    score += pregunta.peso * opcion.factor;
-  }
+export function clasificarProspectoScore(score:number){if(score>=70)return"ALTA_OPORTUNIDAD";if(score>=45)return"MEDIA_OPORTUNIDAD";return"BAJA_OPORTUNIDAD"}
 
-  const resultado = Math.round(score);
-
-  return {
-    score: Math.max(0, Math.min(100, resultado)),
-    clasificacion: clasificarProspectoScore(resultado),
-  };
-}
-
-export function analizarProspectoScore(
-  respuestas: ProspectoScoreAnswers,
-): ProspectoScoreAnalysis {
-  const items = PROSPECTO_SCORE_QUESTIONS.map((pregunta) => {
-    const opcion = pregunta.opciones.find(
-      (item) => item.value === respuestas[pregunta.id],
-    );
-
-    if (!opcion) {
-      throw new Error(`Respuesta inválida para ${pregunta.id}`);
-    }
-
-    return {
-      preguntaId: pregunta.id,
-      titulo: pregunta.titulo,
-      respuesta: opcion.label,
-      aporte: Math.round(pregunta.peso * opcion.factor * 10) / 10,
-      peso: pregunta.peso,
-      factor: opcion.factor,
-    };
-  });
-
-  const fortalezas = items
-    .filter((item) => item.factor >= 0.8)
-    .sort((a, b) => b.peso - a.peso)
-    .slice(0, 4)
-    .map(({ factor: _factor, ...item }) => item);
-
-  const alertas = items
-    .filter((item) => item.factor < 0.6)
-    .sort((a, b) => b.peso * (1 - b.factor) - a.peso * (1 - a.factor))
-    .slice(0, 4)
-    .map(({ factor: _factor, ...item }) => item);
-
-  const acciones = alertas.map((alerta) => {
-    const accionesPorPregunta: Record<string, string> = {
-      proposito_categoria:
-        "Precisar el motivo del viaje y confirmar que las actividades declaradas encajen con una visita temporal antes de avanzar.",
-      plan_temporal:
-        "Definir mejor duración, destinos, fechas tentativas y actividades para que el plan sea coherente con el propósito declarado.",
-      vinculos_retorno:
-        "Identificar y documentar compromisos objetivos de retorno que realmente existan y puedan verificarse.",
-      continuidad_actividad:
-        "Completar la evidencia de la actividad laboral, empresarial, académica o explicar claramente la situación actual.",
-      capacidad_costos:
-        "Alinear presupuesto, duración y fuente de fondos; reunir respaldo verificable propio o del tercero que financiará el viaje.",
-      consistencia_global:
-        "Resolver contradicciones entre historia, formulario y documentos antes de preparar una solicitud.",
-      cumplimiento_migratorio:
-        "Detener la preparación estándar y solicitar revisión especializada del antecedente migratorio antes de continuar.",
-      rechazos_cambios:
-        "Revisar el rechazo previo, entender qué circunstancias siguen iguales y qué evidencia nueva existe antes de una nueva solicitud.",
-      preparacion_entrevista:
-        "Practicar una explicación breve, natural y consistente del propósito, financiamiento, duración y razones de retorno.",
-    };
-
-    return accionesPorPregunta[alerta.preguntaId] ??
-      `Revisar y fortalecer: ${alerta.titulo}.`;
-  });
-
-  const { score } = calcularProspectoScore(respuestas);
-  const prioridadComercial: ProspectoScoreAnalysis["prioridadComercial"] =
-    score >= 75 ? "ALTA" : score >= 50 ? "MEDIA" : "BAJA";
-
-  return {
-    prioridadComercial,
-    fortalezas,
-    alertas,
-    acciones: [...new Set(acciones)].slice(0, 4),
-  };
-}
-
-export function clasificarProspectoScore(score: number) {
-  if (score >= 82) return "ALTO";
-  if (score >= 65) return "MEDIO_ALTO";
-  if (score >= 45) return "MEDIO";
-  return "BAJO";
-}
-
-export function validarRespuestasProspectoScore(respuestas: ProspectoScoreAnswers) {
-  return PROSPECTO_SCORE_QUESTIONS.every((pregunta) => {
-    const valor = respuestas[pregunta.id];
-    return pregunta.opciones.some((opcion) => opcion.value === valor);
-  });
-}
+export function validarRespuestasProspectoScore(respuestas:ProspectoScoreAnswers){return PROSPECTO_SCORE_QUESTIONS.every(p=>{const respuesta=respuestas[p.id];if(p.multiple){if(!Array.isArray(respuesta)||respuesta.length<1||respuesta.length>(p.maxSelections??2))return false;const sin=respuesta.includes("sin_antecedentes");if(sin&&respuesta.length>1)return false;return respuesta.every(v=>p.opciones.some(o=>o.value===v))}return typeof respuesta==="string"&&p.opciones.some(o=>o.value===respuesta)})}

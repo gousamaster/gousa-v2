@@ -1,6 +1,9 @@
 "use client";
 
+import { ArrowLeft } from "lucide-react";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import { obtenerTodasLasRegiones } from "@/lib/actions/catalogos/regiones-actions";
@@ -17,6 +20,10 @@ function LoadingSkeleton() {
 }
 
 export function ClientsContainer() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const seccion = searchParams.get("seccion");
+  const mostrandoAfiliados = seccion === "afiliados";
   const [isLoading, setIsLoading] = useState(true);
   const [clientes, setClientes] = useState<ClienteGestionComercial[]>([]);
   const [regiones, setRegiones] = useState<Array<{ id: string; nombre: string }>>([]);
@@ -41,5 +48,12 @@ export function ClientsContainer() {
 
   if (isLoading) return <div className="flex-1 space-y-6 p-8 pt-6"><div><h2 className="text-3xl font-bold tracking-tight">Clientes</h2><p className="text-muted-foreground">Gestiona los clientes y sus datos</p></div><LoadingSkeleton /></div>;
 
-  return <div className="flex-1 space-y-6 p-8 pt-6"><div><h2 className="text-3xl font-bold tracking-tight">Clientes</h2><p className="text-muted-foreground">Gestiona clientes y sanea los registros históricos antes de trabajar únicamente con datos reales de NEXUS. Flujo: Prospecto → Cliente → Afiliado.</p></div><ClientList initialClientes={clientes} regiones={regiones} onRefresh={loadData} /><AfiliadosPanel clientes={clientes.filter((c) => c.activo)} /></div>;
+  if (mostrandoAfiliados) {
+    return <div className="flex-1 space-y-6 p-8 pt-6">
+      <div className="flex flex-wrap items-center justify-between gap-3"><div><h2 className="text-3xl font-bold tracking-tight">Clientes Afiliados</h2><p className="text-muted-foreground">Separa claramente los clientes plenamente afiliados de quienes todavía están pendientes de afiliación.</p></div><Button variant="outline" onClick={()=>router.push("/clients")}><ArrowLeft className="mr-2 h-4 w-4"/>Volver a Clientes</Button></div>
+      <AfiliadosPanel clientes={clientes} />
+    </div>;
+  }
+
+  return <div className="flex-1 space-y-6 p-8 pt-6"><div><h2 className="text-3xl font-bold tracking-tight">Clientes</h2><p className="text-muted-foreground">Gestiona clientes, históricos e inactivos. Los afiliados se consultan desde su acceso específico.</p></div><ClientList initialClientes={clientes} regiones={regiones} onRefresh={loadData} /></div>;
 }

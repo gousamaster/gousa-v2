@@ -2,7 +2,7 @@
 
 "use client";
 
-import { Plus, Search } from "lucide-react";
+import { Loader2, Plus, Search } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { ConfirmationDialog } from "@/components/shared/confirmation-dialog";
@@ -10,6 +10,14 @@ import { DataTable } from "@/components/shared/data-table";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+} from "@/components/ui/sheet";
+import { resetUserPasswordBySuperAdmin } from "@/lib/actions/admin-user-security-actions";
 import type {
   DepartmentWithRelations,
   UserWithRelations,
@@ -40,6 +48,10 @@ export function UserList({
   const [userToDelete, setUserToDelete] = useState<UserWithRelations | null>(
     null,
   );
+  const [passwordUser, setPasswordUser] = useState<UserWithRelations | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [isChangingPassword, setIsChangingPassword] = useState(false);
 
   const filteredUsers = initialUsers.filter(
     (user) =>
@@ -60,6 +72,12 @@ export function UserList({
   const handleManageRole = (user: UserWithRelations) => {
     setSelectedUser(user);
     setIsFormOpen(true);
+  };
+
+  const handleResetPassword = (user: UserWithRelations) => {
+    setPasswordUser(user);
+    setNewPassword("");
+    setConfirmPassword("");
   };
 
   const confirmDelete = async () => {
@@ -83,7 +101,42 @@ export function UserList({
     setSelectedUser(null);
   };
 
-  const columns = createUserColumns(handleEdit, handleDelete, handleManageRole);
+  const handlePasswordChange = async () => {
+    if (!passwordUser) return;
+    if (!newPassword || newPassword.length < 8) {
+      toast.error("La contraseña debe tener al menos 8 caracteres");
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("Las contraseñas no coinciden");
+      return;
+    }
+
+    setIsChangingPassword(true);
+    try {
+      const result = await resetUserPasswordBySuperAdmin(passwordUser.id, newPassword);
+      if (result.success) {
+        toast.success(`Contraseña actualizada para ${passwordUser.name}`);
+        setPasswordUser(null);
+        setNewPassword("");
+        setConfirmPassword("");
+      } else {
+        toast.error(result.error || "No se pudo cambiar la contraseña");
+      }
+    } catch (error) {
+      console.error(error);
+      toast.error("No se pudo cambiar la contraseña");
+    } finally {
+      setIsChangingPassword(false);
+    }
+  };
+
+  const columns = createUserColumns(
+    handleEdit,
+    handleDelete,
+    handleManageRole,
+    handleResetPassword,
+  );
 
   return (
     <>
@@ -135,6 +188,82 @@ export function UserList({
         confirmText="Eliminar"
         variant="destructive"
       />
+
+      <Sheet
+        open={!!passwordUser}
+        onOpenChange={(open) => {
+          if (!open) {
+            setPasswordUser(null);
+            setNewPassword("");
+            setConfirmPassword("");
+          }
+        }}
+      >
+        <SheetContent className="w-full sm:max-w-md p-4">
+          <SheetHeader>
+            <SheetTitle>Cambiar contraseña</SheetTitle>
+            <SheetDescription>
+              {passwordUser
+                ? `Define una nueva contraseña para ${passwordUser.name}. Solo un SUPER_ADMIN puede ejecutar esta acción.`
+                : ""}
+            </SheetDescription>
+          </SheetHeader>
+
+          <div className="mt-6 space-y-4">
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="admin-new-password">
+                Nueva contraseña
+              </label>
+              <Input
+                id="admin-new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                placeholder="Mínimo 8 caracteres"
+                autoComplete="new-password"
+              />
+              <p className="text-xs text-muted-foreground">
+                Debe contener mayúsculas, minúsculas y números.
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium" htmlFor="admin-confirm-password">
+                Confirmar contraseña
+              </label>
+              <Input
+                id="admin-confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                placeholder="Repite la nueva contraseña"
+                autoComplete="new-password"
+              />
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                type="button"
+                variant="outline"
+                className="flex-1"
+                onClick={() => setPasswordUser(null)}
+                disabled={isChangingPassword}
+              >
+                Cancelar
+              </Button>
+              <Button
+                type="button"
+                className="flex-1"
+                onClick={handlePasswordChange}
+                disabled={isChangingPassword || !newPassword || !confirmPassword}
+              >
+                {isChangingPassword && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Cambiar contraseña
+              </Button>
+            </div>
+          </div>
+        </SheetContent>
+      </Sheet>
     </>
   );
 }

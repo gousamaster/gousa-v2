@@ -5,7 +5,7 @@
 import type { ColumnDef } from "@tanstack/react-table";
 import { format } from "date-fns";
 import { es } from "date-fns/locale";
-import { MoreHorizontal, Pencil, Trash2, UserCog } from "lucide-react";
+import { KeyRound, MoreHorizontal, Pencil, Trash2, UserCog } from "lucide-react";
 import { RoleBadge } from "@/components/shared/role-badge";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -25,6 +25,7 @@ interface UserActionsProps {
   onEdit: (user: UserWithRelations) => void;
   onDelete: (user: UserWithRelations) => void;
   onManageRole: (user: UserWithRelations) => void;
+  onResetPassword: (user: UserWithRelations) => void;
 }
 
 function UserActions({
@@ -32,6 +33,7 @@ function UserActions({
   onEdit,
   onDelete,
   onManageRole,
+  onResetPassword,
 }: UserActionsProps) {
   return (
     <DropdownMenu>
@@ -52,6 +54,10 @@ function UserActions({
           <UserCog className="mr-2 h-4 w-4" />
           Gestionar rol
         </DropdownMenuItem>
+        <DropdownMenuItem onClick={() => onResetPassword(user)}>
+          <KeyRound className="mr-2 h-4 w-4" />
+          Cambiar contraseña
+        </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onClick={() => onDelete(user)}
@@ -69,6 +75,7 @@ export const createUserColumns = (
   onEdit: (user: UserWithRelations) => void,
   onDelete: (user: UserWithRelations) => void,
   onManageRole: (user: UserWithRelations) => void,
+  onResetPassword: (user: UserWithRelations) => void,
 ): ColumnDef<UserWithRelations>[] => [
   {
     accessorKey: "name",
@@ -151,6 +158,7 @@ export const createUserColumns = (
         onEdit={onEdit}
         onDelete={onDelete}
         onManageRole={onManageRole}
+        onResetPassword={onResetPassword}
       />
     ),
   },

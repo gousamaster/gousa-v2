@@ -1,7 +1,45 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
-import { auth } from "@/lib/auth";import { db } from "@/lib/db";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
 import { ensureCitaResultadoConsularSchema, RESULTADOS_CONSULARES } from "@/lib/cita-resultado-consular-schema";
 import { ensureNexusPendientesSchema } from "@/lib/nexus-pendientes-schema";
-export async function GET(_request:Request,{params}:{params:Promise<{citaId:string}>}){try{await ensureCitaResultadoConsularSchema();const s=await auth.api.getSession({headers:await headers()});if(!s?.user?.id)return NextResponse.json({error:"No autorizado"},{status:401});const {citaId}=await params;const rows=await db.$queryRaw<any[]>`SELECT r."resultado",r."observaciones",r."registradoAt",u."name" AS "registradoPorNombre" FROM "cita_resultado_consular" r INNER JOIN "user" u ON u."id"=r."registradoPorId" WHERE r."citaId"=${citaId} LIMIT 1`;return NextResponse.json({resultado:rows[0]??null})}catch(e){console.error(e);return NextResponse.json({error:"No se pudo cargar el resultado consular"},{status:500})}}
-export async function POST(request:Request,{params}:{params:Promise<{citaId:string}>}){try{await ensureCitaResultadoConsularSchema();const s=await auth.api.getSession({headers:await headers()});if(!s?.user?.id)return NextResponse.json({error:"No autorizado"},{status:401});const {citaId}=await params;const cita=await db.cita.findFirst({where:{id:citaId,deletedAt:null},select:{id:true,fechaHora:true,tramite:{select:{clienteId:true}},tipoCita:{select:{nombre:true,codigo:true}}}});if(!cita)return NextResponse.json({error:"Cita no encontrada"},{status:404});const d=`${cita.tipoCita.nombre} ${cita.tipoCita.codigo??""}`;if(!/entrevista|consular|embajada/i.test(d))return NextResponse.json({error:"Esta cita no es una entrevista consular"},{status:400});const b=await request.json().catch(()=>({}));const resultado=String(b.resultado??"").toUpperCase();const observaciones=typeof b.observaciones==="string"?b.observaciones.trim().slice(0,1000):null;if(!(RESULTADOS_CONSULARES as readonly string[]).includes(resultado))return NextResponse.json({error:"Resultado no válido"},{status:400});await db.$executeRaw`INSERT INTO "cita_resultado_consular" ("id","citaId","resultado","observaciones","registradoPorId","registradoAt","createdAt","updatedAt") VALUES (${crypto.randomUUID()},${citaId},${resultado},${observaciones||null},${s.user.id},NOW(),NOW(),NOW()) ON CONFLICT ("citaId") DO UPDATE SET "resultado"=EXCLUDED."resultado","observaciones"=EXCLUDED."observaciones","registradoPorId"=EXCLUDED."registradoPorId","registradoAt"=NOW(),"updatedAt"=NOW()`;if(resultado==="REPROGRAMADA")await db.cita.update({where:{id:citaId},data:{estado:"REPROGRAMADA"}});if(resultado==="APROBADA"&&cita.tramite?.clienteId){await ensureNexusPendientesSchema();const pid=`ais-${citaId}`;await db.$executeRaw`INSERT INTO "nexus_pendiente" ("id","titulo","detalle","categoria","fechaObjetivo","clienteId","asignadoAId","creadoPorId","createdAt","updatedAt") VALUES (${pid},'Actualizar autorización de recojo en AIS','Visa aprobada. Actualizar autorización de recojo en Centro de Visas antes del retorno del documento.','DOCUMENTO',NOW(),${cita.tramite.clienteId},${s.user.id},${s.user.id},NOW(),NOW()) ON CONFLICT ("id") DO NOTHING`;}return NextResponse.json({ok:true})}catch(e){console.error(e);return NextResponse.json({error:"No se pudo guardar el resultado consular"},{status:500})}}
+
+export async function GET(_request:Request,{params}:{params:Promise<{citaId:string}>}){
+ try{
+  await ensureCitaResultadoConsularSchema();
+  const s=await auth.api.getSession({headers:await headers()});
+  if(!s?.user?.id)return NextResponse.json({error:"No autorizado"},{status:401});
+  const {citaId}=await params;
+  const rows=await db.$queryRaw<any[]>`SELECT r."resultado",r."observaciones",r."registradoAt",u."name" AS "registradoPorNombre" FROM "cita_resultado_consular" r INNER JOIN "user" u ON u."id"=r."registradoPorId" WHERE r."citaId"=${citaId} LIMIT 1`;
+  return NextResponse.json({resultado:rows[0]??null});
+ }catch(e){console.error(e);return NextResponse.json({error:"No se pudo cargar el resultado consular"},{status:500})}
+}
+
+export async function POST(request:Request,{params}:{params:Promise<{citaId:string}>}){
+ try{
+  await ensureCitaResultadoConsularSchema();
+  const s=await auth.api.getSession({headers:await headers()});
+  if(!s?.user?.id)return NextResponse.json({error:"No autorizado"},{status:401});
+  const {citaId}=await params;
+  const cita=await db.cita.findFirst({where:{id:citaId,deletedAt:null},select:{id:true,fechaHora:true,tramite:{select:{clienteId:true}},tipoCita:{select:{nombre:true,codigo:true}}}});
+  if(!cita)return NextResponse.json({error:"Cita no encontrada"},{status:404});
+  const d=`${cita.tipoCita.nombre} ${cita.tipoCita.codigo??""}`;
+  if(!/entrevista|consular|embajada/i.test(d))return NextResponse.json({error:"Esta cita no es una entrevista consular"},{status:400});
+  const b=await request.json().catch(()=>({}));
+  const resultado=String(b.resultado??"").toUpperCase();
+  const asistencia=String(b.asistencia??"").toUpperCase();
+  const observaciones=typeof b.observaciones==="string"?b.observaciones.trim().slice(0,1000):null;
+  if(!(RESULTADOS_CONSULARES as readonly string[]).includes(resultado))return NextResponse.json({error:"Resultado no válido"},{status:400});
+  if((resultado==="APROBADA"||resultado==="NEGADA")&&asistencia!=="ASISTIO")return NextResponse.json({error:"Para cerrar la entrevista debes confirmar que el cliente asistió"},{status:400});
+  if(resultado==="REPROGRAMADA"&&asistencia!=="REPROGRAMADA")return NextResponse.json({error:"Confirma que la cita fue reprogramada"},{status:400});
+  await db.$executeRaw`INSERT INTO "cita_resultado_consular" ("id","citaId","resultado","observaciones","registradoPorId","registradoAt","createdAt","updatedAt") VALUES (${crypto.randomUUID()},${citaId},${resultado},${observaciones||null},${s.user.id},NOW(),NOW(),NOW()) ON CONFLICT ("citaId") DO UPDATE SET "resultado"=EXCLUDED."resultado","observaciones"=EXCLUDED."observaciones","registradoPorId"=EXCLUDED."registradoPorId","registradoAt"=NOW(),"updatedAt"=NOW()`;
+  if(resultado==="REPROGRAMADA")await db.cita.update({where:{id:citaId},data:{estado:"REPROGRAMADA"}});
+  if(resultado==="APROBADA"&&cita.tramite?.clienteId){
+   await ensureNexusPendientesSchema();
+   const pid=`ais-${citaId}`;
+   await db.$executeRaw`INSERT INTO "nexus_pendiente" ("id","titulo","detalle","categoria","fechaObjetivo","clienteId","asignadoAId","creadoPorId","createdAt","updatedAt") VALUES (${pid},'Actualizar autorización de recojo en AIS','Visa aprobada. Actualizar autorización de recojo en Centro de Visas antes del retorno del documento.','DOCUMENTO',NOW(),${cita.tramite.clienteId},${s.user.id},${s.user.id},NOW(),NOW()) ON CONFLICT ("id") DO NOTHING`;
+  }
+  return NextResponse.json({ok:true});
+ }catch(e){console.error(e);return NextResponse.json({error:"No se pudo guardar el resultado consular"},{status:500})}
+}
