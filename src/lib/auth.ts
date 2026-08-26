@@ -31,8 +31,9 @@ export const auth = betterAuth({
   plugins: [
     nextCookies(),
 
-    // Plugin de administración
+    // Plugin de administración. NEXUS utiliza los roles propios SUPER_ADMIN / ADMIN.
     admin({
+      adminRoles: ["SUPER_ADMIN", "ADMIN"],
       impersonationSessionDuration: 60 * 60, // 1 hora
     }),
 
