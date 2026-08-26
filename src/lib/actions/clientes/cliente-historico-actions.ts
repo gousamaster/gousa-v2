@@ -4,6 +4,7 @@ import { randomUUID } from "node:crypto";
 import { headers } from "next/headers";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { ensureClienteAfiliadoSchema } from "@/lib/cliente-afiliado-schema";
 
 export type ClienteHistoricoInput = {
   nombres: string;
@@ -40,7 +41,7 @@ async function ensureClienteHistorico() {
 
 export async function registrarClienteHistorico(input: ClienteHistoricoInput) {
   try {
-    await ensureClienteHistorico();
+    await Promise.all([ensureClienteHistorico(), ensureClienteAfiliadoSchema()]);
     const session = await auth.api.getSession({ headers: await headers() });
     if (!session?.user?.id) return { success: false, error: "Sesión no válida" };
 
@@ -88,10 +89,20 @@ export async function registrarClienteHistorico(input: ClienteHistoricoInput) {
            ${input.fechaVencimiento ? new Date(`${input.fechaVencimiento}T12:00:00`) : null},
            ${input.aplicacion}, NOW(), NOW())
       `;
+
+      await tx.$executeRaw`
+        INSERT INTO "cliente_afiliado" ("clienteId","afiliado","afiliadoAt","afiliadoPorId","updatedAt")
+        VALUES (${cliente.id},TRUE,CURRENT_TIMESTAMP,${session.user.id},CURRENT_TIMESTAMP)
+        ON CONFLICT ("clienteId") DO UPDATE SET
+          "afiliado"=TRUE,
+          "afiliadoAt"=CURRENT_TIMESTAMP,
+          "afiliadoPorId"=${session.user.id},
+          "updatedAt"=CURRENT_TIMESTAMP
+      `;
       return cliente.id;
     });
 
-    return { success: true, data: { id: clienteId } };
+    return { success: true, data: { id: clienteId, afiliado: true } };
   } catch (error) {
     console.error("Error al registrar cliente histórico:", error);
     return { success: false, error: "No se pudo registrar el cliente histórico" };
