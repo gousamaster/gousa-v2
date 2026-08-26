@@ -12,12 +12,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { ETAPAS_CHINA, guardarChinaOperativo, obtenerChinaOperativo, type ChinaOperativo, type EtapaChina, type SedeChina } from "@/lib/actions/china/china-actions";
 
 const LABELS: Record<EtapaChina,string> = {
-  TOMA_DATOS:"Toma de datos",
-  EVALUACION:"Evaluación",
-  LLENADO_FORMULARIO:"Llenado de formulario",
-  SUBIR_DOCUMENTOS:"Subir documentos",
+  RECOLECCION_DOCUMENTOS:"Recolección de documentos",
+  EVALUACION:"Evaluación de Perfil",
+  TOMA_DATOS:"Toma de Datos",
+  LLENADO_FORMULARIO:"Llenado de Formulario",
+  SUBIR_DOCUMENTOS:"Subida de Documentos",
   PRESENTACION_EMBAJADA:"Presentación en Embajada",
-  RECOJO_DOCUMENTO:"Recojo de documento",
+  RECOJO_DOCUMENTO:"Recojo de documentos",
   FINALIZADO:"Finalizado",
 };
 
@@ -35,7 +36,7 @@ export function ChinaOperativoCard({tramiteId}:{tramiteId:string}){
       <div><p className="font-bold">Visa China · Operación</p><p className="text-xs text-muted-foreground">Flujo independiente de USA. No utiliza DS-160, arancel ni cita consular americana.</p></div>
       <Button asChild size="sm" variant="outline"><a href="https://consular.mfa.gov.cn/LOGIN/login?redirect=%2FVISA%2F" target="_blank" rel="noreferrer">Abrir formulario China <ExternalLink className="ml-2 h-4 w-4"/></a></Button>
     </div>
-    <div className="space-y-2"><Label>Etapa actual</Label><Select value={data.etapa} onValueChange={v=>set("etapa",v as EtapaChina)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{ETAPAS_CHINA.map(e=><SelectItem key={e} value={e}>{LABELS[e]}</SelectItem>)}</SelectContent></Select></div>
+    <div className="rounded-lg border bg-background/80 p-3 space-y-2"><Label>Etapa actual Visa China</Label><Select value={data.etapa} onValueChange={v=>set("etapa",v as EtapaChina)}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent>{ETAPAS_CHINA.map(e=><SelectItem key={e} value={e}>{LABELS[e]}</SelectItem>)}</SelectContent></Select><p className="text-xs text-muted-foreground">Este estado pertenece únicamente al proceso China y no modifica las etapas de Visa USA.</p></div>
     <div className="space-y-3"><div className="flex items-center justify-between"><Label>Hijos (si aplica)</Label><Button type="button" size="sm" variant="outline" onClick={()=>set("hijos",[...data.hijos,""])}><Plus className="mr-1 h-4 w-4"/>Agregar hijo</Button></div>{data.hijos.length===0?<p className="text-xs text-muted-foreground">Sin hijos registrados.</p>:data.hijos.map((h,i)=><div key={i} className="flex gap-2"><Input value={h} onChange={e=>{const hs=[...data.hijos];hs[i]=e.target.value;set("hijos",hs)}} placeholder="Nombre y apellidos del hijo"/><Button type="button" variant="ghost" size="icon" onClick={()=>set("hijos",data.hijos.filter((_,x)=>x!==i))}><Trash2 className="h-4 w-4"/></Button></div>)}</div>
     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4"><label className="flex items-center gap-2 text-sm"><Checkbox checked={data.formularioIniciado} onCheckedChange={v=>set("formularioIniciado",v===true)}/>Formulario iniciado/completado</label><label className="flex items-center gap-2 text-sm"><Checkbox checked={data.documentosSubidos} onCheckedChange={v=>set("documentosSubidos",v===true)}/>Documentos subidos</label></div>
     <div className="rounded-lg border bg-background p-3 space-y-3"><p className="font-semibold text-sm">Presentación en Embajada</p><p className="text-xs text-muted-foreground">Presentación habilitada lunes, miércoles o jueves de 09:00 a 12:00, según corresponda.</p><div className="grid grid-cols-1 sm:grid-cols-2 gap-3"><div><Label>Sede</Label><Select value={data.sedeEmbajada??""} onValueChange={v=>set("sedeEmbajada",v as SedeChina)}><SelectTrigger><SelectValue placeholder="Seleccionar sede"/></SelectTrigger><SelectContent><SelectItem value="LA_PAZ">La Paz</SelectItem><SelectItem value="SANTA_CRUZ">Santa Cruz</SelectItem></SelectContent></Select></div><div><Label>Fecha real de presentación</Label><Input type="date" value={data.fechaPresentacion??""} onChange={e=>set("fechaPresentacion",e.target.value||null)}/></div></div><label className="flex items-center gap-2 text-sm"><Checkbox checked={data.clienteNotificado} onCheckedChange={v=>set("clienteNotificado",v===true)}/>Cliente notificado para presentarse</label></div>
