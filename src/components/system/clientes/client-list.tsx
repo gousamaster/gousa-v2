@@ -1,7 +1,7 @@
 "use client";
 
 import type { RowSelectionState } from "@tanstack/react-table";
-import { CheckSquare, History, Plus, Search, X } from "lucide-react";
+import { CheckSquare, History, Plus, Search, UserCheck, X } from "lucide-react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -41,6 +41,7 @@ export function ClientList({ initialClientes, regiones, onRefresh }: { initialCl
 
   const refresh=()=>{setRowSelection({});onRefresh();};
   const abrirCliente=(c:ClienteListItem)=>router.push(gestion?`/clients/${c.id}?gestion=${gestion.id}`:`/clients/${c.id}`);
+  const abrirAfiliados=()=>router.push("/clients?seccion=afiliados");
   const columns=createClientColumns(abrirCliente,c=>{setSelectedCliente(c);setIsFormOpen(true);},c=>setClienteToDelete(c),async c=>{const r=await toggleClienteActivo(c.id);r.success?(toast.success("Estado actualizado"),refresh()):toast.error(r.error||"Error");},c=>{setClienteGrupoFamiliar(c);setIsGrupoFamiliarOpen(true);},c=>setClienteToProspect(c));
 
   const marcarHistoricos=async()=>{const r=await confirmarServicioHistoricoClientes(selectedIds); if(!r.success)return toast.error(r.error||"No se pudo actualizar"); toast.success(`${r.data.actualizados} registro(s) marcados como servicio histórico confirmado`);setConfirmHistoricos(false);refresh();};
@@ -49,7 +50,7 @@ export function ClientList({ initialClientes, regiones, onRefresh }: { initialCl
 
   return <>
     {gestion&&<div className="rounded-lg border border-primary/30 bg-primary/5 p-4"><p className="font-semibold">Gestión seleccionada: {gestion.nombre}</p><p className="mt-1 text-sm text-muted-foreground">Busca al cliente y usa “Ver detalle”. NEXUS abrirá directamente su flujo de Servicios y Trámites con esta gestión como contexto.</p></div>}
-    <Card><CardHeader><div className="flex items-center justify-between gap-4"><div><CardTitle>Lista de Clientes</CardTitle><p className="mt-1 text-sm text-muted-foreground">Saneamiento histórico: confirma quién sí tomó servicio o devuelve a Prospectos a quien todavía requiere gestión comercial.</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={()=>setIsHistoricoOpen(true)}><History className="mr-2 h-4 w-4"/>Registrar Cliente Histórico</Button><Button onClick={()=>setIsFormOpen(true)}><Plus className="mr-2 h-4 w-4"/>Nuevo cliente</Button></div></div></CardHeader><CardContent>
+    <Card><CardHeader><div className="flex items-center justify-between gap-4"><div><CardTitle>Lista de Clientes</CardTitle><p className="mt-1 text-sm text-muted-foreground">Consulta clientes actuales, históricos e inactivos. Los afiliados tienen su propia vista comercial.</p></div><div className="flex flex-wrap gap-2"><Button variant="outline" onClick={abrirAfiliados}><UserCheck className="mr-2 h-4 w-4"/>Clientes afiliados</Button><Button variant="outline" onClick={()=>setIsHistoricoOpen(true)}><History className="mr-2 h-4 w-4"/>Cliente histórico</Button><Button onClick={()=>setIsFormOpen(true)}><Plus className="mr-2 h-4 w-4"/>Nuevo cliente</Button></div></div></CardHeader><CardContent>
       <div className="mb-4 space-y-4"><div className="relative"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground"/><Input className="pl-10" placeholder="Buscar por nombre, email, teléfono o responsable..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)}/></div>
       {selectedIds.length>0&&<div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border bg-muted p-4"><div className="flex items-center gap-2"><CheckSquare className="h-5 w-5 text-primary"/><span className="font-medium">{selectedIds.length} seleccionado(s)</span><Button variant="ghost" size="sm" onClick={()=>setRowSelection({})}><X className="mr-1 h-4 w-4"/>Limpiar</Button></div>{activeTab==="por_revisar"&&<Button size="sm" onClick={()=>setConfirmHistoricos(true)}>Servicio tomado</Button>}</div>}</div>
       <Tabs value={activeTab} onValueChange={v=>{setActiveTab(v as TabClientes);setRowSelection({});}}><TabsList className="grid w-full max-w-2xl grid-cols-3"><TabsTrigger value="activos">Clientes <Badge variant="secondary" className="ml-2">{activos.length}</Badge></TabsTrigger><TabsTrigger value="por_revisar">Por revisar <Badge variant="secondary" className="ml-2">{porRevisar.length}</Badge></TabsTrigger><TabsTrigger value="inactivos">Inactivos <Badge variant="secondary" className="ml-2">{inactivos.length}</Badge></TabsTrigger></TabsList>
