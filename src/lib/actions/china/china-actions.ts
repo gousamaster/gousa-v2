@@ -4,8 +4,9 @@ import { db } from "@/lib/db";
 import type { ActionResult } from "@/types/action-result-types";
 
 export const ETAPAS_CHINA = [
-  "TOMA_DATOS",
+  "RECOLECCION_DOCUMENTOS",
   "EVALUACION",
+  "TOMA_DATOS",
   "LLENADO_FORMULARIO",
   "SUBIR_DOCUMENTOS",
   "PRESENTACION_EMBAJADA",
@@ -81,8 +82,8 @@ function mapRow(row: ChinaRow): ChinaOperativo {
 
 async function asegurarRegistro(tramiteId: string) {
   await db.$executeRaw`
-    insert into china_tramite_operativo (tramite_id)
-    values (${tramiteId})
+    insert into china_tramite_operativo (tramite_id, etapa)
+    values (${tramiteId}, 'RECOLECCION_DOCUMENTOS')
     on conflict (tramite_id) do nothing
   `;
 }
