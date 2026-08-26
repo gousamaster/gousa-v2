@@ -11,6 +11,7 @@ import {
   UserPlusIcon,
   UsersIcon,
   PlaneIcon,
+  Building2Icon,
 } from "lucide-react";
 import type * as React from "react";
 import { NavMain } from "@/components/navigation/nav-main";
@@ -25,6 +26,7 @@ const data = {
     { title: "Prospectos", url: "/prospectos", icon: UserPlusIcon },
     { title: "Clientes", url: "/clients", icon: UsersIcon },
     { title: "Trámites", url: "/tramites", icon: NotebookIcon },
+    { title: "Visa China", url: "/visa-china", icon: Building2Icon },
     { title: "Citas", url: "/citas", icon: CalendarIcon },
     { title: "Servicios", url: "/servicios", icon: PlaneIcon },
     { title: "Usuarios", url: "/administration", icon: UsersIcon },
