@@ -8,6 +8,9 @@ type ChinaRow = {
   tramite_id: string;
   etapa: EtapaChina;
   hijos: unknown;
+  correo_base_cliente: string | null;
+  correo_cuenta: string | null;
+  contrasena_cuenta: string | null;
   formulario_iniciado: boolean;
   documentos_subidos: boolean;
   sede_embajada: SedeChina | null;
@@ -32,6 +35,9 @@ function mapRow(row: ChinaRow): ChinaOperativo {
     tramiteId: row.tramite_id,
     etapa: row.etapa,
     hijos: Array.isArray(row.hijos) ? row.hijos.filter((x): x is string => typeof x === "string") : [],
+    correoBaseCliente: row.correo_base_cliente,
+    correoCuenta: row.correo_cuenta,
+    contrasenaCuenta: row.contrasena_cuenta,
     formularioIniciado: row.formulario_iniciado,
     documentosSubidos: row.documentos_subidos,
     sedeEmbajada: row.sede_embajada,
@@ -60,12 +66,17 @@ export async function obtenerChinaOperativo(tramiteId: string): Promise<ActionRe
   try {
     await asegurarRegistro(tramiteId);
     const rows = await db.$queryRaw<ChinaRow[]>`
-      select tramite_id, etapa, hijos, formulario_iniciado, documentos_subidos,
-             sede_embajada, cliente_notificado, fecha_notificacion, fecha_presentacion,
-             guia_recojo_recibida, guia_recojo_referencia, guia_recojo_url,
-             fecha_recojo, pasaporte_recogido, fecha_pasaporte_recogido, observaciones
-      from china_tramite_operativo
-      where tramite_id = ${tramiteId}
+      select cto.tramite_id, cto.etapa, cto.hijos,
+             c.email as correo_base_cliente,
+             cto.correo_cuenta, cto.contrasena_cuenta,
+             cto.formulario_iniciado, cto.documentos_subidos,
+             cto.sede_embajada, cto.cliente_notificado, cto.fecha_notificacion, cto.fecha_presentacion,
+             cto.guia_recojo_recibida, cto.guia_recojo_referencia, cto.guia_recojo_url,
+             cto.fecha_recojo, cto.pasaporte_recogido, cto.fecha_pasaporte_recogido, cto.observaciones
+      from china_tramite_operativo cto
+      join tramite t on t.id = cto.tramite_id and t."deletedAt" is null
+      join cliente c on c.id = t."clienteId" and c."deletedAt" is null
+      where cto.tramite_id = ${tramiteId}
       limit 1
     `;
     if (!rows[0]) return { success: false, error: "No se pudo iniciar el flujo China" };
@@ -82,10 +93,14 @@ export async function guardarChinaOperativo(input: ChinaOperativo): Promise<Acti
     if (input.sedeEmbajada && !["LA_PAZ", "SANTA_CRUZ"].includes(input.sedeEmbajada)) return { success: false, error: "Sede inválida" };
     await asegurarRegistro(input.tramiteId);
     const hijos = JSON.stringify(input.hijos.map((h) => h.trim()).filter(Boolean));
+    const correoCuenta = input.correoCuenta?.trim() || null;
+    const contrasenaCuenta = input.contrasenaCuenta?.trim() || null;
     await db.$executeRaw`
       update china_tramite_operativo set
         etapa = ${input.etapa},
         hijos = ${hijos}::jsonb,
+        correo_cuenta = ${correoCuenta},
+        contrasena_cuenta = ${contrasenaCuenta},
         formulario_iniciado = ${input.formularioIniciado},
         documentos_subidos = ${input.documentosSubidos},
         sede_embajada = ${input.sedeEmbajada},
