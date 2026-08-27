@@ -7,6 +7,8 @@ import type {
   UserStatus,
 } from "@prisma/client";
 
+export type NexusUserRole = UserRole | "ACTIVACION_VENTAS";
+
 export interface ActionResult<T = void> {
   success: boolean;
   data?: T;
@@ -31,7 +33,7 @@ export interface PaginatedResult<T> {
 
 export interface UserFilters {
   search?: string;
-  role?: UserRole;
+  role?: NexusUserRole;
   status?: UserStatus;
   departmentId?: string;
   managerId?: string;
@@ -44,7 +46,7 @@ export interface CreateUserDTO {
   phone?: string | null;
   birthDate?: Date | null;
   image?: string | null;
-  role?: UserRole;
+  role?: NexusUserRole;
   status?: UserStatus;
   departmentId?: string | null;
   managerId?: string | null;
@@ -57,7 +59,7 @@ export interface UpdateUserDTO {
   phone?: string | null;
   birthDate?: Date | null;
   image?: string | null;
-  role?: UserRole;
+  role?: NexusUserRole;
   status?: UserStatus;
   departmentId?: string | null;
   managerId?: string | null;
@@ -79,7 +81,7 @@ export interface UserWithRelations {
   banned: boolean | null;
   banReason: string | null;
   banExpires: Date | null;
-  role: UserRole;
+  role: NexusUserRole;
   status: UserStatus;
   departmentId: string | null;
   managerId: string | null;
@@ -90,12 +92,12 @@ export interface UserWithRelations {
   manager?: {
     id: string;
     name: string;
-    role: UserRole;
+    role: NexusUserRole;
   } | null;
   subordinates: {
     id: string;
     name: string;
-    role: UserRole;
+    role: NexusUserRole;
   }[];
 }
 
@@ -137,7 +139,7 @@ export interface DepartmentDetail extends DepartmentWithRelations {
     id: string;
     name: string;
     email: string;
-    role: UserRole;
+    role: NexusUserRole;
   }[];
 }
 
