@@ -56,7 +56,7 @@ const userFormSchema = z.object({
   password: z.string().optional(),
   phone: z.string().optional(),
   birthDate: z.date().optional(),
-  role: z.enum(["SUPER_ADMIN", "ADMIN", "MANAGER", "SUPERVISOR", "USER"]),
+  role: z.enum(["SUPER_ADMIN", "ADMIN", "MANAGER", "SUPERVISOR", "USER", "ACTIVACION_VENTAS"]),
   status: z.enum(["ACTIVE", "INACTIVE", "SUSPENDED"]),
   departmentId: z.string().optional(),
   managerId: z.string().optional(),
@@ -112,7 +112,8 @@ export function UserFormDrawer({
             | "ADMIN"
             | "MANAGER"
             | "SUPERVISOR"
-            | "USER",
+            | "USER"
+            | "ACTIVACION_VENTAS",
           status: user.status as "ACTIVE" | "INACTIVE" | "SUSPENDED",
           departmentId: user.department?.id ?? "",
           managerId: user.manager?.id ?? "",
@@ -349,12 +350,18 @@ export function UserFormDrawer({
                     </FormControl>
                     <SelectContent>
                       <SelectItem value="USER">Usuario</SelectItem>
+                      <SelectItem value="ACTIVACION_VENTAS">Activación / Ventas</SelectItem>
                       <SelectItem value="SUPERVISOR">Supervisor</SelectItem>
                       <SelectItem value="MANAGER">Manager</SelectItem>
                       <SelectItem value="ADMIN">Admin</SelectItem>
                       <SelectItem value="SUPER_ADMIN">Super Admin</SelectItem>
                     </SelectContent>
                   </Select>
+                  {field.value === "ACTIVACION_VENTAS" && (
+                    <FormDescription>
+                      Acceso limitado a Dashboard Time, Prospectos y NEXUS Score. Sin acceso operativo a clientes, trámites, citas, servicios ni administración.
+                    </FormDescription>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
