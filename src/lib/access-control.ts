@@ -4,6 +4,7 @@ export const ACTIVACION_VENTAS_ALLOWED_PREFIXES = [
   "/dashboard",
   "/nexus-score",
   "/prospectos",
+  "/servicios",
 ] as const;
 
 export function isActivacionVentas(role?: string | null): boolean {
