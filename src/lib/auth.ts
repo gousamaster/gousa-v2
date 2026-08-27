@@ -47,6 +47,7 @@ export const auth = betterAuth({
         MANAGER: nexusUserRole,
         SUPERVISOR: nexusUserRole,
         USER: nexusUserRole,
+        ACTIVACION_VENTAS: nexusUserRole,
       },
       defaultRole: "USER",
       impersonationSessionDuration: 60 * 60, // 1 hora
