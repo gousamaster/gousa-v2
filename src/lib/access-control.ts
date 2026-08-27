@@ -11,7 +11,16 @@ export function isActivacionVentas(role?: string | null): boolean {
 }
 
 export function canActivacionVentasAccessPath(pathname: string): boolean {
-  return ACTIVACION_VENTAS_ALLOWED_PREFIXES.some(
-    (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
-  );
+  if (
+    ACTIVACION_VENTAS_ALLOWED_PREFIXES.some(
+      (prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`),
+    )
+  ) {
+    return true;
+  }
+
+  // Excepción controlada: después de convertir un prospecto, Ventas puede abrir
+  // únicamente la ficha individual para emitir el servicio. No se habilita la
+  // bandeja de Clientes ni rutas internas adicionales.
+  return /^\/clients\/[^/]+$/.test(pathname);
 }
