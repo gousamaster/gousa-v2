@@ -1,0 +1,17 @@
+ALTER TABLE china_tramite_operativo
+  ADD COLUMN IF NOT EXISTS documentos_checklist JSONB NOT NULL DEFAULT '{}'::jsonb,
+  ADD COLUMN IF NOT EXISTS respaldo_solicitado BOOLEAN NOT NULL DEFAULT FALSE;
+
+CREATE TABLE IF NOT EXISTS china_tramite_documento (
+  "id" TEXT NOT NULL PRIMARY KEY,
+  "tramiteId" TEXT NOT NULL REFERENCES tramite(id) ON DELETE CASCADE ON UPDATE CASCADE,
+  "tipo" TEXT NOT NULL,
+  "nombreArchivo" TEXT NOT NULL,
+  "mimeType" TEXT NOT NULL,
+  "tamanoBytes" INTEGER NOT NULL,
+  "contenido" BYTEA NOT NULL,
+  "subidoPorId" TEXT NOT NULL REFERENCES "user"(id) ON DELETE RESTRICT ON UPDATE CASCADE,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  UNIQUE("tramiteId","tipo")
+);
