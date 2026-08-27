@@ -34,14 +34,14 @@ export async function obtenerCumpleanosHoy(): Promise<ActionResult<CumpleanosHoy
         email: string | null;
       }>
     >`
-      SELECT "id", "nombres", "apellidos", "fechaNacimiento", "telefonoCelular", "email"
-      FROM "cliente"
-      WHERE "deletedAt" IS NULL
-        AND "activo" = TRUE
-        AND "fechaNacimiento" IS NOT NULL
-        AND EXTRACT(MONTH FROM "fechaNacimiento") = ${mes}
-        AND EXTRACT(DAY FROM "fechaNacimiento") = ${dia}
-      ORDER BY "apellidos" ASC, "nombres" ASC
+      SELECT c."id", c."nombres", c."apellidos", c."fechaNacimiento", c."telefonoCelular", c."email"
+      FROM "cliente" c
+      INNER JOIN "cliente_afiliado" a ON a."clienteId" = c."id" AND a."afiliado" = TRUE
+      WHERE c."deletedAt" IS NULL
+        AND c."fechaNacimiento" IS NOT NULL
+        AND EXTRACT(MONTH FROM c."fechaNacimiento") = ${mes}
+        AND EXTRACT(DAY FROM c."fechaNacimiento") = ${dia}
+      ORDER BY c."apellidos" ASC, c."nombres" ASC
     `;
 
     return {
