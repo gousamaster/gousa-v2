@@ -16,6 +16,9 @@ export type ChinaOperativo = {
   tramiteId: string;
   etapa: EtapaChina;
   hijos: string[];
+  correoBaseCliente: string | null;
+  correoCuenta: string | null;
+  contrasenaCuenta: string | null;
   formularioIniciado: boolean;
   documentosSubidos: boolean;
   sedeEmbajada: SedeChina | null;
