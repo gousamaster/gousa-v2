@@ -13,7 +13,7 @@ export async function GET(){
     const session=await auth.api.getSession({headers:await headers()});
     if(!session?.user?.id)return NextResponse.json({error:"No autorizado"},{status:401});
     const rows=await db.$queryRaw<Array<any>>`
-      SELECT c."id",c."fechaHora",c."lugar",tc."nombre" AS "tipoCita",
+      SELECT c."id",c."fechaHora",c."lugar",c."estado",tc."nombre" AS "tipoCita",
         cl."id" AS "clienteId",
         CASE WHEN cl."id" IS NOT NULL THEN TRIM(cl."nombres" || ' ' || cl."apellidos") ELSE NULL END AS "cliente",
         gf."nombre" AS "grupoFamiliar",
@@ -37,9 +37,10 @@ export async function GET(){
       LEFT JOIN "grupo_familiar" gf ON gf."id"=c."grupoFamiliarId"
       LEFT JOIN "cita_resultado_consular" rc ON rc."citaId"=c."id"
       LEFT JOIN "entrevista_recordatorio" er ON er."citaId"=c."id"
-      WHERE c."deletedAt" IS NULL AND c."estado" <> 'CANCELADA'
+      WHERE c."deletedAt" IS NULL AND c."estado" NOT IN ('CANCELADA','COMPLETADA')
         AND (LOWER(tc."nombre") LIKE '%entrevista%' OR LOWER(COALESCE(tc."codigo",'')) LIKE '%entrevista%' OR LOWER(tc."nombre") LIKE '%consular%' OR LOWER(tc."nombre") LIKE '%embajada%')
-        AND (c."fechaHora" - INTERVAL '4 hours')::date BETWEEN (NOW() AT TIME ZONE 'America/La_Paz')::date AND ((NOW() AT TIME ZONE 'America/La_Paz')::date + 6)
+        AND c."fechaHora" >= NOW() - INTERVAL '12 hours'
+        AND (c."fechaHora" - INTERVAL '4 hours')::date <= ((NOW() AT TIME ZONE 'America/La_Paz')::date + 6)
       ORDER BY c."fechaHora" ASC`;
     const regionAgenda=(regionNombre:string|null,lugar:string|null)=>{const base=`${regionNombre??""} ${lugar??""}`.toLowerCase();if(base.includes("cochabamba"))return "COCHABAMBA";if(base.includes("la paz")||base.includes("embajada"))return "LA_PAZ";return "INTERIOR"};
     const entrevistas=rows.map(r=>({...r,participantes:Number(r.participantes),horasDesdeCita:Number(r.horasDesdeCita),diaOffset:Number(r.diaOffset),recordatorioEnviado:r.recordatorioEnviado===true,region:regionAgenda(r.regionNombre,r.lugar),totalServicio:Number(r.totalServicio??0),abonado:Number(r.abonado??0),saldoPendiente:Number(r.saldoPendiente??0),efectivoNoConfirmado:r.efectivoNoConfirmado===true,cobroPendiente:Number(r.saldoPendiente??0)>0||r.efectivoNoConfirmado===true,estadoResultado:r.resultado?r.resultado:Number(r.diaOffset)>0?"PROXIMA":Number(r.horasDesdeCita)>=6?"ATRASADO":Number(r.horasDesdeCita)>=0?"PENDIENTE":"PROXIMA"}));
