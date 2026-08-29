@@ -22,10 +22,28 @@ export async function obtenerGruposFamiliaresActivos(): Promise<
   ActionResult<GrupoFamiliarListItem[]>
 > {
   try {
+    // La lista operativa para asignación solo debe mostrar familias que todavía
+    // tengan al menos un cliente pendiente. Los clientes finalizados/inactivos
+    // y los afiliados continúan en la base histórica, pero no aparecen aquí.
+    const afiliados = await db.$queryRaw<Array<{ clienteId: string }>>`
+      SELECT "clienteId"
+      FROM "cliente_afiliado"
+      WHERE "afiliado" = TRUE
+    `;
+    const afiliadosIds = new Set(afiliados.map((item) => item.clienteId));
+
     const grupos = await db.grupoFamiliar.findMany({
       where: {
         activo: true,
         deletedAt: null,
+        miembros: {
+          some: {
+            cliente: {
+              activo: true,
+              deletedAt: null,
+            },
+          },
+        },
       },
       include: {
         miembros: {
@@ -35,6 +53,8 @@ export async function obtenerGruposFamiliaresActivos(): Promise<
                 id: true,
                 nombres: true,
                 apellidos: true,
+                activo: true,
+                deletedAt: true,
               },
             },
           },
@@ -43,7 +63,16 @@ export async function obtenerGruposFamiliaresActivos(): Promise<
       orderBy: { createdAt: "desc" },
     });
 
-    const gruposFormateados = grupos.map((grupo) => {
+    const gruposPendientes = grupos.filter((grupo) =>
+      grupo.miembros.some(
+        (miembro) =>
+          miembro.cliente.activo &&
+          miembro.cliente.deletedAt === null &&
+          !afiliadosIds.has(miembro.cliente.id),
+      ),
+    );
+
+    const gruposFormateados = gruposPendientes.map((grupo) => {
       const titular = grupo.miembros.find((m) => m.esTitular);
       return {
         id: grupo.id,
