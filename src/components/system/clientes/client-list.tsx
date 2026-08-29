@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { eliminarCliente, toggleClienteActivo } from "@/lib/actions/clientes/clientes-actions";
-import { agregarMiembro, obtenerParentescos } from "@/lib/actions/clientes/grupos-familiares-actions";
+import { agregarMiembro, crearGrupoFamiliar, obtenerParentescos } from "@/lib/actions/clientes/grupos-familiares-actions";
 import { confirmarServicioHistoricoClientes } from "@/lib/actions/clientes/saneamiento-clientes-actions";
 import { obtenerGruposFamiliaresActivos } from "@/lib/actions/grupos-familiares/grupos-familiares-actions";
 import { convertirClienteSinServicioAProspecto } from "@/lib/actions/prospectos/prospecto-cliente-actions";
@@ -30,6 +30,7 @@ import { GrupoFamiliarDrawer } from "./grupo-familiar-drawer";
 type ClienteComercial = ClienteListItem & { serviciosContratados?: number; tramitesTotal?: number; sinServicio?: boolean; servicioHistoricoConfirmado?: boolean };
 type TabClientes = "activos" | "por_revisar" | "inactivos";
 type Parentesco = { id: string; nombre: string; codigo: string };
+type ModoGrupo = "EXISTENTE" | "NUEVO";
 
 export function ClientList({ initialClientes, regiones, onRefresh }: { initialClientes: ClienteComercial[]; regiones: Array<{ id: string; nombre: string }>; onRefresh: () => void }) {
   const router = useRouter();
@@ -76,27 +77,57 @@ export function ClientList({ initialClientes, regiones, onRefresh }: { initialCl
 function AsignarGrupoFamiliarDrawer({open,onOpenChange,clientes,onSuccess}:{open:boolean;onOpenChange:(v:boolean)=>void;clientes:ClienteListItem[];onSuccess:()=>void}){
   const[grupos,setGrupos]=useState<GrupoFamiliarListItem[]>([]);
   const[parentescos,setParentescos]=useState<Parentesco[]>([]);
+  const[modo,setModo]=useState<ModoGrupo>("EXISTENTE");
   const[grupoId,setGrupoId]=useState("");
+  const[nuevoGrupoNombre,setNuevoGrupoNombre]=useState("");
+  const[titularId,setTitularId]=useState("");
   const[relaciones,setRelaciones]=useState<Record<string,string>>({});
   const[loading,setLoading]=useState(false);
   const[saving,setSaving]=useState(false);
 
-  useEffect(()=>{if(!open)return;setLoading(true);setGrupoId("");setRelaciones({});void Promise.all([obtenerGruposFamiliaresActivos(),obtenerParentescos()]).then(([g,p])=>{if(g.success&&g.data)setGrupos(g.data);else toast.error(g.error||"No se pudieron cargar los grupos familiares");if(p.success&&p.data)setParentescos(p.data);else toast.error(p.error||"No se pudieron cargar los parentescos");}).finally(()=>setLoading(false));},[open]);
+  useEffect(()=>{if(!open)return;setLoading(true);setModo("EXISTENTE");setGrupoId("");setNuevoGrupoNombre("");setTitularId(clientes[0]?.id??"");setRelaciones({});void Promise.all([obtenerGruposFamiliaresActivos(),obtenerParentescos()]).then(([g,p])=>{if(g.success&&g.data)setGrupos(g.data);else toast.error(g.error||"No se pudieron cargar los grupos familiares");if(p.success&&p.data)setParentescos(p.data);else toast.error(p.error||"No se pudieron cargar los parentescos");}).finally(()=>setLoading(false));},[open,clientes]);
 
   async function asignar(){
-    if(!grupoId)return toast.error("Selecciona el grupo familiar");
+    if(clientes.length===0)return toast.error("Selecciona al menos un cliente");
     const sinParentesco=clientes.filter(c=>!relaciones[c.id]);
     if(sinParentesco.length)return toast.error(`Selecciona el parentesco de ${sinParentesco[0].nombreCompleto}`);
+    if(modo==="EXISTENTE"&&!grupoId)return toast.error("Selecciona el grupo familiar");
+    if(modo==="NUEVO"){
+      if(nuevoGrupoNombre.trim().length<2)return toast.error("Ingresa el nombre del nuevo grupo familiar");
+      if(!titularId)return toast.error("Selecciona quién será el titular del grupo");
+    }
+
     setSaving(true);
-    let agregados=0,omitidos=0;
+    let destinoId=grupoId;
+    let creados=0;
+    let agregados=0;
+    let omitidos=0;
+
+    if(modo==="NUEVO"){
+      const titular=clientes.find(c=>c.id===titularId);
+      if(!titular){setSaving(false);return toast.error("El titular debe ser una de las personas seleccionadas");}
+      const creado=await crearGrupoFamiliar(titularId,{nombre:nuevoGrupoNombre.trim(),parentescoTitularId:relaciones[titularId]});
+      if(!creado.success||!creado.data){setSaving(false);return toast.error(creado.error||"No se pudo crear el grupo familiar");}
+      destinoId=creado.data.id;
+      creados=1;
+      agregados=1;
+    }
+
     for(const cliente of clientes){
-      const r=await agregarMiembro(grupoId,{clienteId:cliente.id,parentescoId:relaciones[cliente.id]});
+      if(modo==="NUEVO"&&cliente.id===titularId)continue;
+      const r=await agregarMiembro(destinoId,{clienteId:cliente.id,parentescoId:relaciones[cliente.id]});
       if(r.success)agregados++;else if((r.error||"").toLowerCase().includes("ya es miembro"))omitidos++;else{setSaving(false);toast.error(`${cliente.nombreCompleto}: ${r.error||"No se pudo asignar"}`);return;}
     }
     setSaving(false);
-    toast.success(`${agregados} cliente(s) asignados al grupo familiar${omitidos?` · ${omitidos} ya pertenecían al grupo`:""}`);
+    toast.success(modo==="NUEVO"?`Grupo familiar creado con ${agregados} integrante(s)`:`${agregados} cliente(s) asignados al grupo familiar${omitidos?` · ${omitidos} ya pertenecían al grupo`:""}`);
     onSuccess();
   }
 
-  return <Sheet open={open} onOpenChange={onOpenChange}><SheetContent className="w-full overflow-y-auto sm:max-w-xl"><SheetHeader><SheetTitle>Asignar a grupo familiar</SheetTitle><SheetDescription>Los clientes seleccionados seguirán siendo registros individuales. NEXUS solo los vinculará al mismo grupo para poder gestionar simulacros y entrevistas grupales.</SheetDescription></SheetHeader><div className="space-y-5 px-4 pb-6">{loading?<p className="text-sm text-muted-foreground">Cargando grupos familiares...</p>:<><div className="space-y-2"><p className="text-sm font-medium">Grupo familiar</p><Select value={grupoId} onValueChange={setGrupoId}><SelectTrigger className="w-full"><SelectValue placeholder="Selecciona un grupo existente"/></SelectTrigger><SelectContent>{grupos.map(g=><SelectItem key={g.id} value={g.id}>{g.nombre}{g.titular?` · Titular: ${g.titular.nombreCompleto}`:""} · {g.totalMiembros} miembro(s)</SelectItem>)}</SelectContent></Select>{grupos.length===0&&<p className="text-xs text-muted-foreground">No hay grupos familiares activos. Crea primero un grupo desde el menú individual de un cliente.</p>}</div><div className="space-y-3"><p className="text-sm font-medium">Personas seleccionadas ({clientes.length})</p>{clientes.map(c=><div key={c.id} className="rounded-lg border p-3"><p className="font-medium text-sm">{c.nombreCompleto}</p><p className="mb-2 text-xs text-muted-foreground">{c.email||c.telefonoCelular||"Cliente GO USA"}</p><Select value={relaciones[c.id]||""} onValueChange={v=>setRelaciones(prev=>({...prev,[c.id]:v}))}><SelectTrigger className="w-full"><SelectValue placeholder="Parentesco dentro del grupo"/></SelectTrigger><SelectContent>{parentescos.map(p=><SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent></Select></div>)}</div><div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">Una vez vinculados, el grupo podrá utilizarse para programar un mismo simulacro o entrevista para sus integrantes. No se fusionan fichas ni se altera el servicio individual de cada cliente.</div><div className="flex gap-3"><Button type="button" variant="outline" className="flex-1" onClick={()=>onOpenChange(false)} disabled={saving}>Cancelar</Button><Button type="button" className="flex-1" onClick={()=>void asignar()} disabled={saving||!grupoId||clientes.length===0}>{saving?"Asignando...":"Asignar seleccionados"}</Button></div></>}</div></SheetContent></Sheet>;
+  return <Sheet open={open} onOpenChange={onOpenChange}><SheetContent className="w-full overflow-y-auto sm:max-w-xl"><SheetHeader><SheetTitle>Asignar a grupo familiar</SheetTitle><SheetDescription>Los clientes seleccionados seguirán siendo registros individuales. Puedes vincularlos a un grupo existente o crear uno nuevo con esta misma selección.</SheetDescription></SheetHeader><div className="space-y-5 px-4 pb-6">{loading?<p className="text-sm text-muted-foreground">Cargando grupos familiares...</p>:<>
+    <div className="space-y-2"><p className="text-sm font-medium">¿Qué deseas hacer?</p><Select value={modo} onValueChange={v=>{setModo(v as ModoGrupo);setGrupoId("");}}><SelectTrigger className="w-full"><SelectValue/></SelectTrigger><SelectContent><SelectItem value="EXISTENTE">Asignar a un grupo existente</SelectItem><SelectItem value="NUEVO">Crear grupo con los seleccionados</SelectItem></SelectContent></Select></div>
+    {modo==="EXISTENTE"?<div className="space-y-2"><p className="text-sm font-medium">Grupo familiar</p><Select value={grupoId} onValueChange={setGrupoId}><SelectTrigger className="w-full"><SelectValue placeholder="Selecciona un grupo existente"/></SelectTrigger><SelectContent>{grupos.map(g=><SelectItem key={g.id} value={g.id}>{g.nombre}{g.titular?` · Titular: ${g.titular.nombreCompleto}`:""} · {g.totalMiembros} miembro(s)</SelectItem>)}</SelectContent></Select>{grupos.length===0&&<p className="text-xs text-muted-foreground">No hay grupos familiares activos. Puedes crear uno ahora con las personas seleccionadas.</p>}</div>:<div className="space-y-3 rounded-lg border p-3"><div className="space-y-2"><p className="text-sm font-medium">Nombre del nuevo grupo</p><Input value={nuevoGrupoNombre} onChange={e=>setNuevoGrupoNombre(e.target.value)} placeholder="Ej. Familia Vidal Amurrio"/></div><div className="space-y-2"><p className="text-sm font-medium">Titular del grupo</p><Select value={titularId} onValueChange={setTitularId}><SelectTrigger className="w-full"><SelectValue placeholder="Selecciona titular"/></SelectTrigger><SelectContent>{clientes.map(c=><SelectItem key={c.id} value={c.id}>{c.nombreCompleto}</SelectItem>)}</SelectContent></Select><p className="text-xs text-muted-foreground">El titular será uno de los clientes seleccionados; los demás quedarán como miembros del mismo grupo.</p></div></div>}
+    <div className="space-y-3"><p className="text-sm font-medium">Personas seleccionadas ({clientes.length})</p>{clientes.map(c=><div key={c.id} className="rounded-lg border p-3"><div className="flex items-start justify-between gap-2"><div><p className="font-medium text-sm">{c.nombreCompleto}</p><p className="mb-2 text-xs text-muted-foreground">{c.email||c.telefonoCelular||"Cliente GO USA"}</p></div>{modo==="NUEVO"&&c.id===titularId&&<Badge variant="secondary">Titular</Badge>}</div><Select value={relaciones[c.id]||""} onValueChange={v=>setRelaciones(prev=>({...prev,[c.id]:v}))}><SelectTrigger className="w-full"><SelectValue placeholder="Parentesco dentro del grupo"/></SelectTrigger><SelectContent>{parentescos.map(p=><SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent></Select></div>)}</div>
+    <div className="rounded-lg border bg-muted/30 p-3 text-xs text-muted-foreground">Una vez vinculados, el grupo podrá utilizarse para programar un mismo simulacro o entrevista para sus integrantes. No se fusionan fichas ni se altera el servicio individual de cada cliente.</div>
+    <div className="flex gap-3"><Button type="button" variant="outline" className="flex-1" onClick={()=>onOpenChange(false)} disabled={saving}>Cancelar</Button><Button type="button" className="flex-1" onClick={()=>void asignar()} disabled={saving||clientes.length===0||(modo==="EXISTENTE"&&!grupoId)||(modo==="NUEVO"&&(!nuevoGrupoNombre.trim()||!titularId))}>{saving?(modo==="NUEVO"?"Creando...":"Asignando..."):(modo==="NUEVO"?"Crear grupo familiar":"Asignar seleccionados")}</Button></div>
+  </>}</div></SheetContent></Sheet>;
 }
