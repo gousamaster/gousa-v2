@@ -23,7 +23,7 @@ import { etiquetaOrigenProspecto } from "@/lib/prospectos/origenes";
 
 interface ClientePerfilPageProps {
   params: Promise<{ id: string }>;
-  searchParams: Promise<{ gestion?: string }>;
+  searchParams: Promise<{ gestion?: string; tab?: string }>;
 }
 
 type OrigenComercialRow = {
@@ -41,7 +41,7 @@ export default async function ClientePerfilPage({ params, searchParams }: Client
   const session = await auth.api.getSession({ headers: await headers() });
   if (!session?.user) redirect("/sign-in");
 
-  const [{ id }, { gestion }, currentUser] = await Promise.all([
+  const [{ id }, { gestion, tab }, currentUser] = await Promise.all([
     params,
     searchParams,
     db.user.findUnique({ where: { id: session.user.id }, select: { role: true } }),
@@ -84,6 +84,8 @@ export default async function ClientePerfilPage({ params, searchParams }: Client
   }
 
   const tieneGrupoFamiliar = cliente.gruposFamiliares && cliente.gruposFamiliares.length > 0;
+  const tabsValidos = new Set(["migratorio", "servicios", "citas", "documentos", "centro-visas", "bitacora"]);
+  const tabInicial = tab && tabsValidos.has(tab) ? tab : "servicios";
 
   return (
     <div className="flex-1 space-y-6 p-8 pt-6">
@@ -114,7 +116,7 @@ export default async function ClientePerfilPage({ params, searchParams }: Client
         </Card>
       )}
 
-      <Tabs defaultValue="servicios">
+      <Tabs defaultValue={tabInicial}>
         <TabsList className="flex h-auto flex-wrap">
           <TabsTrigger value="migratorio">Migratorio</TabsTrigger><TabsTrigger value="servicios">Servicios y Trámites</TabsTrigger><TabsTrigger value="citas">Citas</TabsTrigger><TabsTrigger value="documentos">Documentos</TabsTrigger><TabsTrigger value="centro-visas">Centro de Visas</TabsTrigger><TabsTrigger value="bitacora">Bitácora</TabsTrigger>
         </TabsList>
