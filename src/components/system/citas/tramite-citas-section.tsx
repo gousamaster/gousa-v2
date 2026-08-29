@@ -26,33 +26,35 @@ export function TramiteCitasSection({tramiteId,regionId}:TramiteCitasSectionProp
  const[citaDetalleId,setCitaDetalleId]=useState<string|null>(null);
  const[tipoPreferido,setTipoPreferido]=useState<"SIMULACRO"|"ENTREVISTA"|undefined>(undefined);
  const[contextoFamiliar,setContextoFamiliar]=useState<ContextoCitaFamiliar>({grupoFamiliarId:null,grupoNombre:null,tramitesDisponibles:[]});
- const ultimoEstadoRef=useRef<string|null>(null);
+ const autoAbiertoRef=useRef<string|null>(null);
  const verificandoRef=useRef(false);
 
  const cargar=async()=>{setIsLoading(true);const[citasResult,familiaResult]=await Promise.all([obtenerCitasPorTramite(tramiteId),obtenerContextoCitaFamiliar(tramiteId)]);if(citasResult.success&&citasResult.data)setCitas(citasResult.data);if(familiaResult.success&&familiaResult.data)setContextoFamiliar(familiaResult.data);setIsLoading(false)};
- useEffect(()=>{void cargar()},[tramiteId]);
+ useEffect(()=>{autoAbiertoRef.current=null;void cargar()},[tramiteId]);
 
+ // NEXUS usa los estados "Programar Entrevista" y "Programar Simulacro" como acciones.
+ // Al entrar en cualquiera de ellos, la agenda debe abrirse automáticamente sin obligar
+ // al asesor a bajar hasta "Nueva Cita". El ref evita reaperturas durante el mismo render.
  useEffect(()=>{
-  if(isLoading||verificandoRef.current)return;
+  if(isLoading||verificandoRef.current||isProgramarOpen)return;
   verificandoRef.current=true;
   void(async()=>{
    try{
     const r=await obtenerTramitePorId(tramiteId);
     if(!r.success||!r.data)return;
-    const estadoId=r.data.estadoActual.id;
-    const cambio=ultimoEstadoRef.current!==estadoId;
-    ultimoEstadoRef.current=estadoId;
-    const nombre=r.data.estadoActual.nombre;
-    const esSimulacro=/programar\s+simulacro|simulacr/i.test(nombre);
-    const esEntrevista=/programar\s+entrevista|entrevista\s+embajada/i.test(nombre);
+    const nombre=r.data.estadoActual.nombre.trim();
+    const esSimulacro=/^programar\s+simulacro$/i.test(nombre)||/simulacr/i.test(nombre);
+    const esEntrevista=/^programar\s+entrevista$/i.test(nombre)||/entrevista\s+embajada/i.test(nombre);
     const tipo=esSimulacro?"SIMULACRO":esEntrevista?"ENTREVISTA":undefined;
-    if(!cambio||!tipo)return;
-    const patron=tipo==="SIMULACRO"?/simulacr/i:/entrevista|consular|embajada/i;
-    const tieneActivo=citas.some(c=>patron.test(c.tipoCita.nombre)&&c.estado!=="COMPLETADA"&&c.estado!=="CANCELADA");
-    if(!tieneActivo){setTipoPreferido(tipo);setIsProgramarOpen(true)}
+    if(!tipo){autoAbiertoRef.current=null;return;}
+    const clave=`${r.data.estadoActual.id}:${tipo}`;
+    if(autoAbiertoRef.current===clave)return;
+    autoAbiertoRef.current=clave;
+    setTipoPreferido(tipo);
+    setIsProgramarOpen(true);
    }finally{verificandoRef.current=false}
   })();
- });
+ },[isLoading,isProgramarOpen,tramiteId,citas.length]);
 
  return <div className="space-y-3">
   <div className="flex items-center justify-between"><div><p className="font-medium text-sm">Citas</p>{contextoFamiliar.grupoFamiliarId&&<p className="text-xs text-muted-foreground">Grupo familiar: {contextoFamiliar.grupoNombre} · puedes programar la misma cita para sus miembros pendientes.</p>}</div><Button size="sm" variant="outline" onClick={()=>{setTipoPreferido(undefined);setIsProgramarOpen(true)}}><CalendarPlus className="h-4 w-4 mr-2"/>Nueva Cita</Button></div>
