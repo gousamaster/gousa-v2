@@ -13,144 +13,37 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import {
-  asignarClienteAGrupoPendiente,
-  crearGrupoFamiliarDesdeTramite,
-  obtenerOpcionesGrupoFamiliarPendientes,
-  type GrupoFamiliarPendienteOption,
-  type ParentescoOption,
-} from "@/lib/actions/grupos-familiares/grupo-tramite-actions";
+import { asignarClienteAGrupoPendiente, crearGrupoFamiliarDesdeTramite, obtenerOpcionesGrupoFamiliarPendientes, type GrupoFamiliarPendienteOption, type ParentescoOption } from "@/lib/actions/grupos-familiares/grupo-tramite-actions";
 import { crearTramite, obtenerContextoInicioTramite, obtenerEstadosTramite, obtenerUsuariosAsignables } from "@/lib/actions/tramites/tramites-actions";
 import { useSession } from "@/lib/auth-client";
 import { type CreateTramiteFormData, createTramiteSchema } from "@/validations/tramite-validations";
 
-interface IniciarTramiteDialogProps {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  clienteId: string;
-  clienteServicioId: string;
-  onSuccess: (tramiteId: string) => void;
-}
+interface IniciarTramiteDialogProps { open:boolean; onOpenChange:(open:boolean)=>void; clienteId:string; clienteServicioId:string; onSuccess:(tramiteId:string)=>void }
+type GrupoModo="NINGUNO"|"EXISTENTE"|"NUEVO";
+type EstadoItem={id:string;nombre:string;color:string|null;orden:number};
 
-type GrupoModo = "NINGUNO" | "EXISTENTE" | "NUEVO";
+const FLUJO_NUEVA=["Evaluacion de Perfil","Toma de Datos","Envio de Documentos","Llenado de Formulario","Creacion de Cuenta Plataforma","Pago Arancel","Programar Entrevista","Programar Simulacro","Recojo y Entrega de Documentacion"];
+const FLUJO_RENOVACION=["Revision de estado migratorio","Evaluacion de Perfil","Toma de Datos","Llenado de Formulario","Creacion de Cuenta Plataforma","Pago Arancel","Recepcion de Documentos","Despacho de Documentos","Recojo y Entrega de Documentacion"];
 
-export function IniciarTramiteDialog({open,onOpenChange,clienteId,clienteServicioId,onSuccess}:IniciarTramiteDialogProps) {
-  const { data: session } = useSession();
-  const [estados,setEstados]=useState<Array<{id:string;nombre:string;color:string|null;orden:number}>>([]);
-  const [usuarios,setUsuarios]=useState<Array<{id:string;name:string}>>([]);
-  const [isSubmitting,setIsSubmitting]=useState(false);
-  const [esChina,setEsChina]=useState(false);
-  const [servicioNombre,setServicioNombre]=useState("");
-  const [cargandoContexto,setCargandoContexto]=useState(false);
-  const [grupos,setGrupos]=useState<GrupoFamiliarPendienteOption[]>([]);
-  const [parentescos,setParentescos]=useState<ParentescoOption[]>([]);
-  const [grupoModo,setGrupoModo]=useState<GrupoModo>("NINGUNO");
-  const [grupoFamiliarId,setGrupoFamiliarId]=useState("");
-  const [nuevoGrupoNombre,setNuevoGrupoNombre]=useState("");
-  const [parentescoId,setParentescoId]=useState("");
-
-  const {register,control,handleSubmit,reset,setValue,formState:{errors}}=useForm<CreateTramiteFormData>({resolver:zodResolver(createTramiteSchema),defaultValues:{clienteId,clienteServicioId}});
-
-  useEffect(()=>{
-    if(!open)return;
-    setCargandoContexto(true);
-    Promise.all([
-      obtenerEstadosTramite(),
-      obtenerUsuariosAsignables(),
-      obtenerContextoInicioTramite(clienteServicioId),
-      obtenerOpcionesGrupoFamiliarPendientes(),
-    ]).then(([eResult,uResult,cResult,gResult])=>{
-      if(eResult.success&&eResult.data)setEstados(eResult.data);
-      if(uResult.success&&uResult.data)setUsuarios(uResult.data);
-      if(cResult.success&&cResult.data){
-        setEsChina(cResult.data.esChina);
-        setServicioNombre(cResult.data.servicioNombre);
-        if(cResult.data.esChina&&cResult.data.estadoTecnicoInicialId)setValue("estadoActualId",cResult.data.estadoTecnicoInicialId,{shouldValidate:true});
-      }
-      if(gResult.success&&gResult.data){
-        setGrupos(gResult.data.grupos);
-        setParentescos(gResult.data.parentescos);
-      }
-      setCargandoContexto(false);
-    });
-  },[open,clienteServicioId,setValue]);
-
-  const limpiarGrupo=()=>{
-    setGrupoModo("NINGUNO");
-    setGrupoFamiliarId("");
-    setNuevoGrupoNombre("");
-    setParentescoId("");
-  };
-
-  const handleOpenChange=(isOpen:boolean)=>{
-    if(!isOpen){reset();setEsChina(false);setServicioNombre("");limpiarGrupo()}
-    onOpenChange(isOpen)
-  };
-
-  const prepararGrupo=async()=>{
-    if(grupoModo==="NINGUNO")return {success:true as const};
-    if(!parentescoId)return {success:false as const,error:"Selecciona el parentesco dentro del grupo familiar"};
-    if(grupoModo==="EXISTENTE"){
-      if(!grupoFamiliarId)return {success:false as const,error:"Selecciona un grupo familiar"};
-      return asignarClienteAGrupoPendiente(clienteId,grupoFamiliarId,parentescoId);
-    }
-    if(nuevoGrupoNombre.trim().length<2)return {success:false as const,error:"Ingresa el nombre del nuevo grupo familiar"};
-    return crearGrupoFamiliarDesdeTramite(clienteId,nuevoGrupoNombre,parentescoId);
-  };
-
-  const onSubmit=handleSubmit(async(data)=>{
-    if(!session?.user?.id)return;
-    setIsSubmitting(true);
-
-    const grupoResult=await prepararGrupo();
-    if(!grupoResult.success){
-      setIsSubmitting(false);
-      toast.error(grupoResult.error??"No se pudo preparar el grupo familiar");
-      return;
-    }
-
-    const result=await crearTramite(data,session.user.id);
-    setIsSubmitting(false);
-    if(result.success&&result.data){
-      toast.success(esChina?"Trámite Visa China iniciado en Recolección de documentos":"Trámite iniciado correctamente");
-      handleOpenChange(false);
-      onSuccess(result.data.id)
-    }else toast.error(result.error??"Error al iniciar el trámite")
-  });
-
-  return <Dialog open={open} onOpenChange={handleOpenChange}><DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{esChina?"Iniciar Trámite · Visa China":"Iniciar Trámite"}</DialogTitle></DialogHeader>
-    <form onSubmit={onSubmit} className="space-y-4 mt-2">
-      {cargandoContexto?<div className="flex items-center gap-2 rounded-lg border p-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin"/>Identificando flujo del servicio...</div>:esChina?<div className="rounded-lg border border-red-200 bg-red-50/50 p-3"><p className="text-sm font-semibold">{servicioNombre}</p><p className="mt-1 text-xs text-muted-foreground">Este servicio usa el flujo exclusivo de Visa China. La etapa inicial será <b>Recolección de documentos</b>.</p><div className="mt-3 rounded-md bg-background px-3 py-2 text-sm"><span className="text-muted-foreground">Etapa inicial:</span> <b>Recolección de documentos</b></div></div>:<div className="space-y-2"><Label>Estado inicial <span className="text-destructive">*</span></Label><Controller control={control} name="estadoActualId" render={({field})=><Select value={field.value??""} onValueChange={field.onChange}><SelectTrigger><SelectValue placeholder="Selecciona estado inicial"/></SelectTrigger><SelectContent>{estados.map(e=><SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}</SelectContent></Select>}/>{errors.estadoActualId&&<p className="text-sm text-destructive">{errors.estadoActualId.message}</p>}</div>}
-      <div className="space-y-2"><Label>Asignar a usuario</Label><Controller control={control} name="usuarioAsignadoId" render={({field})=><Select value={field.value??""} onValueChange={v=>field.onChange(v||null)}><SelectTrigger><SelectValue placeholder="Sin asignar"/></SelectTrigger><SelectContent>{usuarios.map(u=><SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent></Select>}/></div>
-
-      <div className="rounded-lg border p-3 space-y-3">
-        <div><Label>Grupo familiar</Label><p className="mt-1 text-xs text-muted-foreground">Vincula este trámite desde el inicio para gestionar después acciones grupales como simulacro, entrevista y recojo.</p></div>
-        <Select value={grupoModo} onValueChange={(v)=>{setGrupoModo(v as GrupoModo);setGrupoFamiliarId("");setNuevoGrupoNombre("");setParentescoId("")}}>
-          <SelectTrigger><SelectValue/></SelectTrigger>
-          <SelectContent>
-            <SelectItem value="NINGUNO">No pertenece a grupo familiar</SelectItem>
-            <SelectItem value="EXISTENTE">Seleccionar grupo familiar pendiente</SelectItem>
-            <SelectItem value="NUEVO">Crear nuevo grupo familiar</SelectItem>
-          </SelectContent>
-        </Select>
-
-        {grupoModo==="EXISTENTE"&&(
-          <div className="space-y-3">
-            {grupos.length>0?<div className="space-y-2"><Label>Grupo pendiente</Label><Select value={grupoFamiliarId} onValueChange={setGrupoFamiliarId}><SelectTrigger><SelectValue placeholder="Seleccionar familia"/></SelectTrigger><SelectContent>{grupos.map(g=><SelectItem key={g.id} value={g.id}>{g.nombre} · Titular: {g.titularNombre??"Sin titular"} · {g.totalMiembros} miembro(s)</SelectItem>)}</SelectContent></Select></div>:<div className="rounded-md bg-muted p-3 text-sm"><p>No hay grupos familiares pendientes disponibles.</p><Button type="button" variant="link" className="h-auto p-0 mt-1" onClick={()=>setGrupoModo("NUEVO")}>Crear uno ahora</Button></div>}
-            {grupos.length>0&&<div className="space-y-2"><Label>Parentesco</Label><Select value={parentescoId} onValueChange={setParentescoId}><SelectTrigger><SelectValue placeholder="Seleccionar parentesco"/></SelectTrigger><SelectContent>{parentescos.map(p=><SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent></Select></div>}
-          </div>
-        )}
-
-        {grupoModo==="NUEVO"&&(
-          <div className="space-y-3">
-            <div className="space-y-2"><Label>Nombre del nuevo grupo</Label><Input value={nuevoGrupoNombre} onChange={e=>setNuevoGrupoNombre(e.target.value)} placeholder="Ej. Familia Tapia Ticona"/></div>
-            <div className="space-y-2"><Label>Rol / parentesco del titular</Label><Select value={parentescoId} onValueChange={setParentescoId}><SelectTrigger><SelectValue placeholder="Seleccionar parentesco"/></SelectTrigger><SelectContent>{parentescos.map(p=><SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent></Select><p className="text-xs text-muted-foreground">Este cliente quedará como titular inicial del nuevo grupo.</p></div>
-          </div>
-        )}
-      </div>
-
-      <div className="space-y-2"><Label>Notas iniciales</Label><Textarea rows={3} placeholder="Observaciones..." {...register("notas")}/></div>
-      <div className="flex gap-3 pt-2"><Button type="button" variant="outline" className="flex-1" onClick={()=>handleOpenChange(false)} disabled={isSubmitting}>Cancelar</Button><Button type="submit" className="flex-1" disabled={isSubmitting||cargandoContexto}>{isSubmitting&&<Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Iniciar Trámite</Button></div>
-    </form>
-  </DialogContent></Dialog>;
+export function IniciarTramiteDialog({open,onOpenChange,clienteId,clienteServicioId,onSuccess}:IniciarTramiteDialogProps){
+ const{data:session}=useSession();
+ const[estados,setEstados]=useState<EstadoItem[]>([]),[usuarios,setUsuarios]=useState<Array<{id:string;name:string}>>([]),[isSubmitting,setIsSubmitting]=useState(false),[esChina,setEsChina]=useState(false),[servicioNombre,setServicioNombre]=useState(""),[cargandoContexto,setCargandoContexto]=useState(false),[grupos,setGrupos]=useState<GrupoFamiliarPendienteOption[]>([]),[parentescos,setParentescos]=useState<ParentescoOption[]>([]),[grupoModo,setGrupoModo]=useState<GrupoModo>("NINGUNO"),[grupoFamiliarId,setGrupoFamiliarId]=useState(""),[nuevoGrupoNombre,setNuevoGrupoNombre]=useState(""),[parentescoId,setParentescoId]=useState("");
+ const{register,control,handleSubmit,reset,setValue,formState:{errors}}=useForm<CreateTramiteFormData>({resolver:zodResolver(createTramiteSchema),defaultValues:{clienteId,clienteServicioId}});
+ useEffect(()=>{if(!open)return;setCargandoContexto(true);Promise.all([obtenerEstadosTramite(),obtenerUsuariosAsignables(),obtenerContextoInicioTramite(clienteServicioId),obtenerOpcionesGrupoFamiliarPendientes()]).then(([eResult,uResult,cResult,gResult])=>{
+   if(uResult.success&&uResult.data)setUsuarios(uResult.data);
+   if(cResult.success&&cResult.data){const ctx=cResult.data;setEsChina(ctx.esChina);setServicioNombre(ctx.servicioNombre);if(ctx.esChina){setEstados([]);if(ctx.estadoTecnicoInicialId)setValue("estadoActualId",ctx.estadoTecnicoInicialId,{shouldValidate:true})}else if(eResult.success&&eResult.data){const esRenovacion=/renovaci/i.test(ctx.servicioNombre);const permitidos=esRenovacion?FLUJO_RENOVACION:FLUJO_NUEVA;const filtrados=permitidos.map(nombre=>eResult.data!.find(e=>e.nombre===nombre)).filter((e):e is EstadoItem=>!!e);setEstados(filtrados);const inicial=filtrados[0];if(inicial)setValue("estadoActualId",inicial.id,{shouldValidate:true})}}
+   else if(eResult.success&&eResult.data)setEstados(eResult.data);
+   if(gResult.success&&gResult.data){setGrupos(gResult.data.grupos);setParentescos(gResult.data.parentescos)}setCargandoContexto(false)});},[open,clienteServicioId,setValue]);
+ const limpiarGrupo=()=>{setGrupoModo("NINGUNO");setGrupoFamiliarId("");setNuevoGrupoNombre("");setParentescoId("")};
+ const handleOpenChange=(isOpen:boolean)=>{if(!isOpen){reset();setEsChina(false);setServicioNombre("");setEstados([]);limpiarGrupo()}onOpenChange(isOpen)};
+ const prepararGrupo=async()=>{if(grupoModo==="NINGUNO")return{success:true as const};if(!parentescoId)return{success:false as const,error:"Selecciona el parentesco dentro del grupo familiar"};if(grupoModo==="EXISTENTE"){if(!grupoFamiliarId)return{success:false as const,error:"Selecciona un grupo familiar"};return asignarClienteAGrupoPendiente(clienteId,grupoFamiliarId,parentescoId)}if(nuevoGrupoNombre.trim().length<2)return{success:false as const,error:"Ingresa el nombre del nuevo grupo familiar"};return crearGrupoFamiliarDesdeTramite(clienteId,nuevoGrupoNombre,parentescoId)};
+ const onSubmit=handleSubmit(async data=>{if(!session?.user?.id)return;setIsSubmitting(true);const grupoResult=await prepararGrupo();if(!grupoResult.success){setIsSubmitting(false);toast.error(grupoResult.error??"No se pudo preparar el grupo familiar");return}const result=await crearTramite(data,session.user.id);setIsSubmitting(false);if(result.success&&result.data){toast.success(esChina?"Trámite Visa China iniciado en Recolección de documentos":"Trámite iniciado correctamente");handleOpenChange(false);onSuccess(result.data.id)}else toast.error(result.error??"Error al iniciar el trámite")});
+ const esRenovacion=/renovaci/i.test(servicioNombre);
+ return <Dialog open={open} onOpenChange={handleOpenChange}><DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto"><DialogHeader><DialogTitle>{esChina?"Iniciar Trámite · Visa China":"Iniciar Trámite"}</DialogTitle></DialogHeader><form onSubmit={onSubmit} className="space-y-4 mt-2">
+ {cargandoContexto?<div className="flex items-center gap-2 rounded-lg border p-3 text-sm text-muted-foreground"><Loader2 className="h-4 w-4 animate-spin"/>Identificando flujo del servicio...</div>:esChina?<div className="rounded-lg border border-red-200 bg-red-50/50 p-3"><p className="text-sm font-semibold">{servicioNombre}</p><p className="mt-1 text-xs text-muted-foreground">Este servicio usa el flujo exclusivo de Visa China. La etapa inicial será <b>Recolección de documentos</b>.</p><div className="mt-3 rounded-md bg-background px-3 py-2 text-sm"><span className="text-muted-foreground">Etapa inicial:</span> <b>Recolección de documentos</b></div></div>:<div className="space-y-2"><div><Label>Estado inicial <span className="text-destructive">*</span></Label><p className="mt-1 text-xs text-muted-foreground">Flujo: {esRenovacion?"Renovación de Visa USA":"Solicitud de Visa USA"}</p></div><Controller control={control} name="estadoActualId" render={({field})=><Select value={field.value??""} onValueChange={field.onChange}><SelectTrigger><SelectValue placeholder="Selecciona estado inicial"/></SelectTrigger><SelectContent>{estados.map(e=><SelectItem key={e.id} value={e.id}>{e.nombre}</SelectItem>)}</SelectContent></Select>}/>{errors.estadoActualId&&<p className="text-sm text-destructive">{errors.estadoActualId.message}</p>}</div>}
+ <div className="space-y-2"><Label>Asignar a usuario</Label><Controller control={control} name="usuarioAsignadoId" render={({field})=><Select value={field.value??""} onValueChange={v=>field.onChange(v||null)}><SelectTrigger><SelectValue placeholder="Sin asignar"/></SelectTrigger><SelectContent>{usuarios.map(u=><SelectItem key={u.id} value={u.id}>{u.name}</SelectItem>)}</SelectContent></Select>}/></div>
+ <div className="rounded-lg border p-3 space-y-3"><div><Label>Grupo familiar</Label><p className="mt-1 text-xs text-muted-foreground">Vincula este trámite desde el inicio para gestionar después acciones grupales como simulacro, entrevista y recojo.</p></div><Select value={grupoModo} onValueChange={v=>{setGrupoModo(v as GrupoModo);setGrupoFamiliarId("");setNuevoGrupoNombre("");setParentescoId("")}}><SelectTrigger><SelectValue/></SelectTrigger><SelectContent><SelectItem value="NINGUNO">No pertenece a grupo familiar</SelectItem><SelectItem value="EXISTENTE">Seleccionar grupo familiar pendiente</SelectItem><SelectItem value="NUEVO">Crear nuevo grupo familiar</SelectItem></SelectContent></Select>
+ {grupoModo==="EXISTENTE"&&<div className="space-y-3">{grupos.length>0?<div className="space-y-2"><Label>Grupo pendiente</Label><Select value={grupoFamiliarId} onValueChange={setGrupoFamiliarId}><SelectTrigger><SelectValue placeholder="Seleccionar familia"/></SelectTrigger><SelectContent>{grupos.map(g=><SelectItem key={g.id} value={g.id}>{g.nombre} · Titular: {g.titularNombre??"Sin titular"} · {g.totalMiembros} miembro(s)</SelectItem>)}</SelectContent></Select></div>:<div className="rounded-md bg-muted p-3 text-sm"><p>No hay grupos familiares pendientes disponibles.</p><Button type="button" variant="link" className="h-auto p-0 mt-1" onClick={()=>setGrupoModo("NUEVO")}>Crear uno ahora</Button></div>}{grupos.length>0&&<div className="space-y-2"><Label>Parentesco</Label><Select value={parentescoId} onValueChange={setParentescoId}><SelectTrigger><SelectValue placeholder="Seleccionar parentesco"/></SelectTrigger><SelectContent>{parentescos.map(p=><SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent></Select></div>}</div>}
+ {grupoModo==="NUEVO"&&<div className="space-y-3"><div className="space-y-2"><Label>Nombre del nuevo grupo</Label><Input value={nuevoGrupoNombre} onChange={e=>setNuevoGrupoNombre(e.target.value)} placeholder="Ej. Familia Tapia Ticona"/></div><div className="space-y-2"><Label>Rol / parentesco del titular</Label><Select value={parentescoId} onValueChange={setParentescoId}><SelectTrigger><SelectValue placeholder="Seleccionar parentesco"/></SelectTrigger><SelectContent>{parentescos.map(p=><SelectItem key={p.id} value={p.id}>{p.nombre}</SelectItem>)}</SelectContent></Select><p className="text-xs text-muted-foreground">Este cliente quedará como titular inicial del nuevo grupo.</p></div></div>}</div>
+ <div className="space-y-2"><Label>Notas iniciales</Label><Textarea rows={3} placeholder="Observaciones..." {...register("notas")}/></div><div className="flex gap-3 pt-2"><Button type="button" variant="outline" className="flex-1" onClick={()=>handleOpenChange(false)} disabled={isSubmitting}>Cancelar</Button><Button type="submit" className="flex-1" disabled={isSubmitting||cargandoContexto}>{isSubmitting&&<Loader2 className="mr-2 h-4 w-4 animate-spin"/>}Iniciar Trámite</Button></div></form></DialogContent></Dialog>;
 }
