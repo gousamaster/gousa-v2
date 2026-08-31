@@ -35,7 +35,9 @@ export async function GET(){
         CASE WHEN pr."id" IS NOT NULL THEN TRIM(pr."nombres" || ' ' || COALESCE(pr."apellidos",'')) ELSE NULL END AS "prospecto",
         CASE WHEN cl."id" IS NOT NULL THEN TRIM(cl."nombres" || ' ' || cl."apellidos") ELSE NULL END AS "cliente"
       FROM "nexus_pendiente" p LEFT JOIN "user" u ON u."id"=p."asignadoAId" LEFT JOIN "prospecto" pr ON pr."id"=p."prospectoId" LEFT JOIN "cliente" cl ON cl."id"=p."clienteId"
-      WHERE p."completado"=FALSE AND (p."fechaObjetivo" - INTERVAL '4 hours')::date <= ((NOW() AT TIME ZONE 'America/La_Paz')::date + 2)
+      WHERE p."completado"=FALSE
+        AND (p."fechaObjetivo" - INTERVAL '4 hours')::date <= ((NOW() AT TIME ZONE 'America/La_Paz')::date + 2)
+        AND (p."categoria" <> 'POST_CONSULAR_24H' OR p."fechaObjetivo" <= NOW())
       ORDER BY p."fechaObjetivo" ASC, p."horaInicio" ASC NULLS LAST`;
     const hoy=new Date(new Date().toLocaleString("en-US",{timeZone:"America/La_Paz"}));const hoyBase=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()).getTime();
     const pendientes=rows.map(r=>{const local=new Date(new Date(r.fechaObjetivo).toLocaleString("en-US",{timeZone:"America/La_Paz"}));const base=new Date(local.getFullYear(),local.getMonth(),local.getDate()).getTime();const diaOffset=Math.round((base-hoyBase)/86400000);return {...r,diaOffset,atrasado:diaOffset<0};});
