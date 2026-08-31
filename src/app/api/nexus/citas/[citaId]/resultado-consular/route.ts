@@ -49,7 +49,7 @@ export async function POST(request:Request,{params}:{params:Promise<{citaId:stri
   if(cita.tramite?.clienteId){
     const pid=`ais-${citaId}`;
     if(resultado==="APROBADA"){
-      await db.$executeRaw`INSERT INTO "nexus_pendiente" ("id","titulo","detalle","categoria","fechaObjetivo","clienteId","asignadoAId","creadoPorId","createdAt","updatedAt") VALUES (${pid},'Revisar documento aprobado / FedEx','Visa aprobada. Desde este momento revisar el estado del documento y coordinar recojo/seguimiento en FedEx o Centro de Visas.','DOCUMENTO',NOW()+INTERVAL '24 hours',${cita.tramite.clienteId},${s.user.id},${s.user.id},NOW(),NOW()) ON CONFLICT ("id") DO UPDATE SET "titulo"=EXCLUDED."titulo","detalle"=EXCLUDED."detalle","fechaObjetivo"=EXCLUDED."fechaObjetivo","completado"=FALSE,"updatedAt"=NOW()`;
+      await db.$executeRaw`INSERT INTO "nexus_pendiente" ("id","titulo","detalle","categoria","fechaObjetivo","clienteId","asignadoAId","creadoPorId","createdAt","updatedAt") VALUES (${pid},'Revisar documento aprobado / FedEx','Visa aprobada. Revisar el estado del documento y coordinar recojo/seguimiento en FedEx o Centro de Visas.','POST_CONSULAR_24H',NOW()+INTERVAL '24 hours',${cita.tramite.clienteId},${s.user.id},${s.user.id},NOW(),NOW()) ON CONFLICT ("id") DO UPDATE SET "titulo"=EXCLUDED."titulo","detalle"=EXCLUDED."detalle","categoria"=EXCLUDED."categoria","fechaObjetivo"=EXCLUDED."fechaObjetivo","completado"=FALSE,"updatedAt"=NOW()`;
     }else{
       await db.$executeRaw`DELETE FROM "nexus_pendiente" WHERE "id"=${pid}`;
     }
