@@ -1,6 +1,92 @@
 "use server";
-import{headers}from"next/headers";import{auth}from"@/lib/auth";import{db}from"@/lib/db";
-export type AuditoriaNexusItem={id:string;accion:string;entidad:string;entidadId:string|null;clienteId:string|null;detalle:string|null;usuarioNombre:string|null;createdAt:Date};
-async function ensure(){await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "auditoria_nexus" ("id" TEXT PRIMARY KEY,"accion" TEXT NOT NULL,"entidad" TEXT NOT NULL,"entidadId" TEXT,"clienteId" TEXT REFERENCES "cliente"("id") ON DELETE SET NULL,"detalle" TEXT,"usuarioId" TEXT REFERENCES "user"("id") ON DELETE SET NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);CREATE INDEX IF NOT EXISTS "auditoria_nexus_cliente_idx" ON "auditoria_nexus"("clienteId");CREATE INDEX IF NOT EXISTS "auditoria_nexus_created_idx" ON "auditoria_nexus"("createdAt");`)}
-export async function registrarAuditoriaNexus(input:{accion:string;entidad:string;entidadId?:string|null;clienteId?:string|null;detalle?:string|null;usuarioId?:string|null}){try{await ensure();let usuarioId=input.usuarioId??null;if(!usuarioId){const s=await auth.api.getSession({headers:await headers()});usuarioId=s?.user?.id??null}await db.$executeRaw`INSERT INTO "auditoria_nexus" ("id","accion","entidad","entidadId","clienteId","detalle","usuarioId","createdAt") VALUES (${crypto.randomUUID()},${input.accion},${input.entidad},${input.entidadId??null},${input.clienteId??null},${input.detalle??null},${usuarioId},NOW())`}catch(e){console.error("auditoria nexus",e)}}
-export async function obtenerAuditoriaCliente(clienteId:string):Promise<AuditoriaNexusItem[]>{await ensure();return db.$queryRaw<AuditoriaNexusItem[]>`SELECT a."id",a."accion",a."entidad",a."entidadId",a."clienteId",a."detalle",u."name" AS "usuarioNombre",a."createdAt" FROM "auditoria_nexus" a LEFT JOIN "user" u ON u."id"=a."usuarioId" WHERE a."clienteId"=${clienteId} ORDER BY a."createdAt" DESC LIMIT 200`}
+
+import { headers } from "next/headers";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+
+export type AuditoriaNexusItem = {
+  id: string;
+  accion: string;
+  entidad: string;
+  entidadId: string | null;
+  clienteId: string | null;
+  detalle: string | null;
+  usuarioNombre: string | null;
+  createdAt: Date;
+};
+
+async function ensure() {
+  await db.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS "auditoria_nexus" (
+      "id" TEXT PRIMARY KEY,
+      "accion" TEXT NOT NULL,
+      "entidad" TEXT NOT NULL,
+      "entidadId" TEXT,
+      "clienteId" TEXT REFERENCES "cliente"("id") ON DELETE SET NULL,
+      "detalle" TEXT,
+      "usuarioId" TEXT REFERENCES "user"("id") ON DELETE SET NULL,
+      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+  `);
+
+  await db.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "auditoria_nexus_cliente_idx"
+    ON "auditoria_nexus"("clienteId")
+  `);
+
+  await db.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "auditoria_nexus_created_idx"
+    ON "auditoria_nexus"("createdAt")
+  `);
+}
+
+export async function registrarAuditoriaNexus(input: {
+  accion: string;
+  entidad: string;
+  entidadId?: string | null;
+  clienteId?: string | null;
+  detalle?: string | null;
+  usuarioId?: string | null;
+}) {
+  try {
+    await ensure();
+
+    let usuarioId = input.usuarioId ?? null;
+    if (!usuarioId) {
+      const session = await auth.api.getSession({ headers: await headers() });
+      usuarioId = session?.user?.id ?? null;
+    }
+
+    await db.$executeRaw`
+      INSERT INTO "auditoria_nexus"
+        ("id", "accion", "entidad", "entidadId", "clienteId", "detalle", "usuarioId", "createdAt")
+      VALUES
+        (${crypto.randomUUID()}, ${input.accion}, ${input.entidad}, ${input.entidadId ?? null}, ${input.clienteId ?? null}, ${input.detalle ?? null}, ${usuarioId}, NOW())
+    `;
+  } catch (error) {
+    console.error("auditoria nexus", error);
+  }
+}
+
+export async function obtenerAuditoriaCliente(
+  clienteId: string,
+): Promise<AuditoriaNexusItem[]> {
+  await ensure();
+
+  return db.$queryRaw<AuditoriaNexusItem[]>`
+    SELECT
+      a."id",
+      a."accion",
+      a."entidad",
+      a."entidadId",
+      a."clienteId",
+      a."detalle",
+      u."name" AS "usuarioNombre",
+      a."createdAt"
+    FROM "auditoria_nexus" a
+    LEFT JOIN "user" u ON u."id" = a."usuarioId"
+    WHERE a."clienteId" = ${clienteId}
+    ORDER BY a."createdAt" DESC
+    LIMIT 200
+  `;
+}
