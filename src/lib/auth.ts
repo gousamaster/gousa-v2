@@ -12,10 +12,17 @@ const accessControl = createAccessControl(defaultStatements);
 const nexusAdminRole = accessControl.newRole({ ...adminAc.statements });
 const nexusUserRole = accessControl.newRole({});
 
+const trustedOrigins = [
+  "https://gousa-nexus.vercel.app",
+  process.env.BETTER_AUTH_URL,
+].filter((origin): origin is string => Boolean(origin));
+
 export const auth = betterAuth({
   database: prismaAdapter(db, {
     provider: "postgresql",
   }),
+
+  trustedOrigins,
 
   emailAndPassword: {
     enabled: true,
