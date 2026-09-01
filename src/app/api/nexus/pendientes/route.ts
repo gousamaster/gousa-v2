@@ -31,7 +31,12 @@ export async function GET(){
     const session=await auth.api.getSession({headers:await headers()});
     if(!session?.user?.id)return NextResponse.json({error:"No autorizado"},{status:401});
     const rows=await db.$queryRaw<Array<{id:string;titulo:string;detalle:string|null;categoria:string;fechaObjetivo:Date;completado:boolean;horaInicio:string|null;horaFin:string|null;enviarCorreoEquipo:boolean;correoEstado:string|null;correoEnviadoAt:Date|null;prospectoId:string|null;clienteId:string|null;asignadoAId:string|null;asignadoA:string|null;prospecto:string|null;cliente:string|null;}>>`
-      SELECT p."id",p."titulo",p."detalle",p."categoria",p."fechaObjetivo",p."completado",p."horaInicio",p."horaFin",p."enviarCorreoEquipo",p."correoEstado",p."correoEnviadoAt",p."prospectoId",p."clienteId",p."asignadoAId",u."name" AS "asignadoA",
+      SELECT p."id",
+        CASE WHEN p."categoria"='POST_CONSULAR_24H' AND cl."id" IS NOT NULL
+          THEN p."titulo" || ' · ' || TRIM(cl."nombres" || ' ' || cl."apellidos")
+          ELSE p."titulo"
+        END AS "titulo",
+        p."detalle",p."categoria",p."fechaObjetivo",p."completado",p."horaInicio",p."horaFin",p."enviarCorreoEquipo",p."correoEstado",p."correoEnviadoAt",p."prospectoId",p."clienteId",p."asignadoAId",u."name" AS "asignadoA",
         CASE WHEN pr."id" IS NOT NULL THEN TRIM(pr."nombres" || ' ' || COALESCE(pr."apellidos",'')) ELSE NULL END AS "prospecto",
         CASE WHEN cl."id" IS NOT NULL THEN TRIM(cl."nombres" || ' ' || cl."apellidos") ELSE NULL END AS "cliente"
       FROM "nexus_pendiente" p LEFT JOIN "user" u ON u."id"=p."asignadoAId" LEFT JOIN "prospecto" pr ON pr."id"=p."prospectoId" LEFT JOIN "cliente" cl ON cl."id"=p."clienteId"
