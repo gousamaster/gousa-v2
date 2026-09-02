@@ -18,8 +18,19 @@ export type NarrativasNexus={
 type Editable=Omit<NarrativasNexus,"actualizadoPorNombre"|"updatedAt">;
 const vacio:Editable={trabajoActualEs:null,trabajoActualEn:null,trabajoAnteriorEs:null,trabajoAnteriorEn:null,motivoViajeEs:null,motivoViajeEn:null,motivoNegacionEs:null,motivoNegacionEn:null,sobreestadiaEs:null,sobreestadiaEn:null,antecedenteMigratorioEs:null,antecedenteMigratorioEn:null};
 
+let ready=false;let promise:Promise<void>|null=null;
 async function ensure(){
- await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "cliente_narrativas_nexus" ("clienteId" TEXT PRIMARY KEY REFERENCES "cliente"("id") ON DELETE CASCADE,"trabajoActualEs" TEXT,"trabajoActualEn" TEXT,"trabajoAnteriorEs" TEXT,"trabajoAnteriorEn" TEXT,"motivoViajeEs" TEXT,"motivoViajeEn" TEXT,"motivoNegacionEs" TEXT,"motivoNegacionEn" TEXT,"sobreestadiaEs" TEXT,"sobreestadiaEn" TEXT,"antecedenteMigratorioEs" TEXT,"antecedenteMigratorioEn" TEXT,"actualizadoPorId" TEXT REFERENCES "user"("id") ON DELETE SET NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP);ALTER TABLE "cliente_narrativas_nexus" ADD COLUMN IF NOT EXISTS "sobreestadiaEs" TEXT;ALTER TABLE "cliente_narrativas_nexus" ADD COLUMN IF NOT EXISTS "sobreestadiaEn" TEXT;ALTER TABLE "cliente_narrativas_nexus" ADD COLUMN IF NOT EXISTS "antecedenteMigratorioEs" TEXT;ALTER TABLE "cliente_narrativas_nexus" ADD COLUMN IF NOT EXISTS "antecedenteMigratorioEn" TEXT;`)
+  if(ready)return;
+  if(promise)return promise;
+  promise=(async()=>{
+    await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "cliente_narrativas_nexus" ("clienteId" TEXT PRIMARY KEY REFERENCES "cliente"("id") ON DELETE CASCADE,"trabajoActualEs" TEXT,"trabajoActualEn" TEXT,"trabajoAnteriorEs" TEXT,"trabajoAnteriorEn" TEXT,"motivoViajeEs" TEXT,"motivoViajeEn" TEXT,"motivoNegacionEs" TEXT,"motivoNegacionEn" TEXT,"sobreestadiaEs" TEXT,"sobreestadiaEn" TEXT,"antecedenteMigratorioEs" TEXT,"antecedenteMigratorioEn" TEXT,"actualizadoPorId" TEXT REFERENCES "user"("id") ON DELETE SET NULL,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP)`);
+    await db.$executeRawUnsafe(`ALTER TABLE "cliente_narrativas_nexus" ADD COLUMN IF NOT EXISTS "sobreestadiaEs" TEXT`);
+    await db.$executeRawUnsafe(`ALTER TABLE "cliente_narrativas_nexus" ADD COLUMN IF NOT EXISTS "sobreestadiaEn" TEXT`);
+    await db.$executeRawUnsafe(`ALTER TABLE "cliente_narrativas_nexus" ADD COLUMN IF NOT EXISTS "antecedenteMigratorioEs" TEXT`);
+    await db.$executeRawUnsafe(`ALTER TABLE "cliente_narrativas_nexus" ADD COLUMN IF NOT EXISTS "antecedenteMigratorioEn" TEXT`);
+    ready=true;
+  })();
+  try{await promise}finally{if(!ready)promise=null}
 }
 
 export async function obtenerNarrativasNexus(clienteId:string):Promise<ActionResult<NarrativasNexus>>{
