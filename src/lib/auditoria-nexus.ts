@@ -15,31 +15,6 @@ export type AuditoriaNexusItem = {
   createdAt: Date;
 };
 
-async function ensure() {
-  await db.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "auditoria_nexus" (
-      "id" TEXT PRIMARY KEY,
-      "accion" TEXT NOT NULL,
-      "entidad" TEXT NOT NULL,
-      "entidadId" TEXT,
-      "clienteId" TEXT REFERENCES "cliente"("id") ON DELETE SET NULL,
-      "detalle" TEXT,
-      "usuarioId" TEXT REFERENCES "user"("id") ON DELETE SET NULL,
-      "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP
-    )
-  `);
-
-  await db.$executeRawUnsafe(`
-    CREATE INDEX IF NOT EXISTS "auditoria_nexus_cliente_idx"
-    ON "auditoria_nexus"("clienteId")
-  `);
-
-  await db.$executeRawUnsafe(`
-    CREATE INDEX IF NOT EXISTS "auditoria_nexus_created_idx"
-    ON "auditoria_nexus"("createdAt")
-  `);
-}
-
 export async function registrarAuditoriaNexus(input: {
   accion: string;
   entidad: string;
@@ -49,8 +24,6 @@ export async function registrarAuditoriaNexus(input: {
   usuarioId?: string | null;
 }) {
   try {
-    await ensure();
-
     let usuarioId = input.usuarioId ?? null;
     if (!usuarioId) {
       const session = await auth.api.getSession({ headers: await headers() });
@@ -71,8 +44,6 @@ export async function registrarAuditoriaNexus(input: {
 export async function obtenerAuditoriaCliente(
   clienteId: string,
 ): Promise<AuditoriaNexusItem[]> {
-  await ensure();
-
   return db.$queryRaw<AuditoriaNexusItem[]>`
     SELECT
       a."id",
