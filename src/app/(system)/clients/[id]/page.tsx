@@ -8,6 +8,7 @@ import { ClienteCentroVisasTab } from "@/components/system/clientes/cliente-cent
 import { ClienteBitacoraTab } from "@/components/system/clientes/cliente-bitacora-tab";
 import { ClienteEntradasUsaNexus } from "@/components/system/clientes/cliente-entradas-usa-nexus";
 import { ClienteVisasChinaPrevias } from "@/components/system/clientes/cliente-visas-china-previas";
+import { ClienteHijosTab } from "@/components/system/clientes/cliente-hijos-tab";
 import { DescargaFichaButton } from "@/components/system/clientes/descarga-ficha-button";
 import { ClienteMigratorioTab } from "@/components/system/clientes/cliente-migratorio-tab";
 import { ClienteServiciosTab } from "@/components/system/tramites/cliente-servicios-tab";
@@ -84,7 +85,7 @@ export default async function ClientePerfilPage({ params, searchParams }: Client
   }
 
   const tieneGrupoFamiliar = cliente.gruposFamiliares && cliente.gruposFamiliares.length > 0;
-  const tabsValidos = new Set(["migratorio", "servicios", "citas", "documentos", "centro-visas", "bitacora"]);
+  const tabsValidos = new Set(["migratorio", "hijos", "servicios", "citas", "documentos", "centro-visas", "bitacora"]);
   const tabInicial = tab && tabsValidos.has(tab) ? tab : "servicios";
 
   return (
@@ -118,8 +119,9 @@ export default async function ClientePerfilPage({ params, searchParams }: Client
 
       <Tabs defaultValue={tabInicial}>
         <TabsList className="flex h-auto flex-wrap">
-          <TabsTrigger value="migratorio">Migratorio</TabsTrigger><TabsTrigger value="servicios">Servicios y Trámites</TabsTrigger><TabsTrigger value="citas">Citas</TabsTrigger><TabsTrigger value="documentos">Documentos</TabsTrigger><TabsTrigger value="centro-visas">Centro de Visas</TabsTrigger><TabsTrigger value="bitacora">Bitácora</TabsTrigger>
+          <TabsTrigger value="migratorio">Migratorio</TabsTrigger><TabsTrigger value="hijos">Hijos</TabsTrigger><TabsTrigger value="servicios">Servicios y Trámites</TabsTrigger><TabsTrigger value="citas">Citas</TabsTrigger><TabsTrigger value="documentos">Documentos</TabsTrigger><TabsTrigger value="centro-visas">Centro de Visas</TabsTrigger><TabsTrigger value="bitacora">Bitácora</TabsTrigger>
         </TabsList>
+        <TabsContent value="hijos" className="mt-4"><ClienteHijosTab clienteId={cliente.id} /></TabsContent>
         <TabsContent value="servicios" className="mt-4"><ClienteServiciosTab cliente={cliente} gestionId={gestion} /></TabsContent>
         <TabsContent value="citas" className="mt-4"><ClienteCitasTab clienteId={cliente.id} /></TabsContent>
         <TabsContent value="migratorio" className="mt-4"><div className="space-y-6"><ClienteMigratorioTab clienteId={cliente.id} datosMigratorios={cliente.datosMigratorios} /><ClienteVisasChinaPrevias clienteId={cliente.id} /><ClienteEntradasUsaNexus clienteId={cliente.id} /></div></TabsContent>
