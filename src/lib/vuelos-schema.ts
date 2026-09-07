@@ -2,11 +2,21 @@ import { db } from "@/lib/db";
 
 export async function ensureVuelosSchema() {
   await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "orden_cotizacion_vuelo_contador" ("anio" INTEGER NOT NULL PRIMARY KEY,"ultimo" INTEGER NOT NULL DEFAULT 0)`);
-  await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "orden_cotizacion_vuelo" ("id" TEXT NOT NULL PRIMARY KEY,"numeroOrden" TEXT NOT NULL UNIQUE,"prospectoId" TEXT REFERENCES "prospecto"("id") ON DELETE RESTRICT ON UPDATE CASCADE,"clienteId" TEXT REFERENCES "cliente"("id") ON DELETE RESTRICT ON UPDATE CASCADE,"tipoViaje" TEXT NOT NULL DEFAULT 'IDA_VUELTA',"cantidadPax" INTEGER NOT NULL DEFAULT 1,"origen" VARCHAR(3) NOT NULL,"destino" VARCHAR(3) NOT NULL,"fechaIda" TIMESTAMP(3) NOT NULL,"fechaRetorno" TIMESTAMP(3),"tramos" JSONB,"flexibilidad" BOOLEAN NOT NULL DEFAULT false,"equipaje" BOOLEAN NOT NULL DEFAULT false,"observaciones" TEXT,"estado" TEXT NOT NULL DEFAULT 'PENDIENTE',"creadoPorId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"despachadoAt" TIMESTAMP(3),CHECK ("origen" <> "destino"),CHECK ("cantidadPax" >= 1))`);
+  await db.$executeRawUnsafe(`CREATE TABLE IF NOT EXISTS "orden_cotizacion_vuelo" ("id" TEXT NOT NULL PRIMARY KEY,"numeroOrden" TEXT NOT NULL UNIQUE,"prospectoId" TEXT REFERENCES "prospecto"("id") ON DELETE RESTRICT ON UPDATE CASCADE,"clienteId" TEXT REFERENCES "cliente"("id") ON DELETE RESTRICT ON UPDATE CASCADE,"tipoViaje" TEXT NOT NULL DEFAULT 'IDA_VUELTA',"cantidadPax" INTEGER NOT NULL DEFAULT 1,"origen" VARCHAR(3) NOT NULL,"destino" VARCHAR(3) NOT NULL,"fechaIda" DATE NOT NULL,"fechaRetorno" DATE,"tramos" JSONB,"flexibilidad" BOOLEAN NOT NULL DEFAULT false,"equipaje" BOOLEAN NOT NULL DEFAULT false,"observaciones" TEXT,"estado" TEXT NOT NULL DEFAULT 'PENDIENTE',"creadoPorId" TEXT NOT NULL REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE,"createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,"despachadoAt" TIMESTAMP(3),CHECK ("origen" <> "destino"),CHECK ("cantidadPax" >= 1))`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ADD COLUMN IF NOT EXISTS "tipoViaje" TEXT NOT NULL DEFAULT 'IDA_VUELTA'`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ADD COLUMN IF NOT EXISTS "tramos" JSONB`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ADD COLUMN IF NOT EXISTS "clienteId" TEXT`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ADD COLUMN IF NOT EXISTS "cantidadPax" INTEGER NOT NULL DEFAULT 1`);
+  // Las fechas de viaje representan días de calendario, no horas. Migrarlas a DATE elimina
+  // cualquier posibilidad de que UTC/Vercel/navegador las desplacen al día anterior o siguiente.
+  await db.$executeRawUnsafe(`DO $$ BEGIN
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='orden_cotizacion_vuelo' AND column_name='fechaIda' AND data_type <> 'date') THEN
+      ALTER TABLE "orden_cotizacion_vuelo" ALTER COLUMN "fechaIda" TYPE DATE USING "fechaIda"::date;
+    END IF;
+    IF EXISTS (SELECT 1 FROM information_schema.columns WHERE table_schema='public' AND table_name='orden_cotizacion_vuelo' AND column_name='fechaRetorno' AND data_type <> 'date') THEN
+      ALTER TABLE "orden_cotizacion_vuelo" ALTER COLUMN "fechaRetorno" TYPE DATE USING "fechaRetorno"::date;
+    END IF;
+  END $$;`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ALTER COLUMN "fechaRetorno" DROP NOT NULL`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" ALTER COLUMN "prospectoId" DROP NOT NULL`);
   await db.$executeRawUnsafe(`ALTER TABLE "orden_cotizacion_vuelo" DROP CONSTRAINT IF EXISTS "orden_cotizacion_vuelo_estado_check"`);
