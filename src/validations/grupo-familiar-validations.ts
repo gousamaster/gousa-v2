@@ -11,7 +11,12 @@ const grupoFamiliarBaseSchema = z.object({
   descripcion: z.string().max(1000).trim().optional().nullable(),
 });
 
-export const createGrupoFamiliarSchema = grupoFamiliarBaseSchema;
+export const createGrupoFamiliarSchema = grupoFamiliarBaseSchema.extend({
+  parentescoTitularId: z
+    .string()
+    .trim()
+    .min(1, "El parentesco del titular es requerido"),
+});
 
 export const updateGrupoFamiliarSchema = grupoFamiliarBaseSchema.partial();
 
