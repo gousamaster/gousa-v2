@@ -2,6 +2,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
 import { VuelosContainer } from "@/components/system/servicios/vuelos/vuelos-container";
+import { VuelosEliminacionAdmin } from "@/components/system/servicios/vuelos/vuelos-eliminacion-admin";
 
 export default async function VuelosPage() {
   const session = await auth.api.getSession({
@@ -12,5 +13,10 @@ export default async function VuelosPage() {
     redirect("/sign-in");
   }
 
-  return <VuelosContainer />;
+  return (
+    <>
+      <VuelosContainer />
+      <VuelosEliminacionAdmin />
+    </>
+  );
 }
