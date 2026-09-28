@@ -383,6 +383,29 @@ convertidoPor User?    @relation("ProspectoConvertidoPor", fields: [convertidoPo
   @@index([deletedAt])
   @@map("prospecto")
 }
+model RegistroCaptacion {
+  id            String   @id @default(cuid())
+  nombres       String
+  apellidos     String?
+  telefono      String
+  origen        String?
+  interes       String?
+  observaciones String?
+  captador      String?
+  consentimiento Boolean @default(false)
+  estado        String   @default("REGISTRO")
+  prospectoId   String?
+  creadoPorId   String?
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([telefono])
+  @@index([origen])
+  @@index([estado])
+  @@index([createdAt])
+  @@map("registro_captacion")
+}
+
 // ============================================
 // CLIENTES
 // ============================================
