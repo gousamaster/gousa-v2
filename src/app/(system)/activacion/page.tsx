@@ -1,0 +1,2 @@
+import { headers } from "next/headers";import { redirect } from "next/navigation";import { auth } from "@/lib/auth";import { ContactosActivacion } from "@/components/system/activacion/contactos-activacion";
+export default async function Page(){const s=await auth.api.getSession({headers:await headers()});if(!s?.user)redirect("/sign-in");return <ContactosActivacion/>;}
