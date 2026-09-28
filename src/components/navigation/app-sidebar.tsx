@@ -9,6 +9,7 @@ import {
   NotebookIcon,
   SettingsIcon,
   UserPlusIcon,
+  ClipboardPlusIcon,
   UsersIcon,
   PlaneIcon,
 } from "lucide-react";
@@ -22,6 +23,7 @@ const data = {
     { title: "Dashboard Time", url: "/dashboard", icon: AppWindowIcon },
     { title: "Dashboard Comercial", url: "/dashboard-comercial", icon: BarChart3Icon },
     { title: "NEXUS Score 2.0", url: "/nexus-score", icon: GaugeIcon },
+    { title: "Registro / Captación", url: "/registros", icon: ClipboardPlusIcon },
     { title: "Prospectos", url: "/prospectos", icon: UserPlusIcon },
     { title: "Clientes", url: "/clients", icon: UsersIcon },
     { title: "Trámites", url: "/tramites", icon: NotebookIcon },
