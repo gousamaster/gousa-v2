@@ -23,7 +23,9 @@ const data={navMain:[
 ]};
 
 export function AppSidebar({role,...props}:React.ComponentProps<typeof Sidebar>&{role?:string|null}){
- const navItems=isActivacionVentas(role)?data.navMain.filter((item)=>["/dashboard","/nexus-score","/activacion","/prospectos","/servicios"].includes(item.url)):data.navMain;
+ const navItems=isActivacionVentas(role)
+  ? data.navMain.filter((item)=>["/activacion","/prospectos","/servicios"].includes(item.url))
+  : data.navMain.filter((item)=>item.url!=="/activacion");
  return <Sidebar collapsible="icon" className="top-(--header-height) h-[calc(100svh-var(--header-height))]! border-r border-blue-100/80" {...props}>
   <SidebarHeader className="border-b border-blue-100/70 bg-gradient-to-b from-blue-50/90 to-white"><SidebarMenu><SidebarMenuItem><SidebarMenuButton size="lg" asChild><a href="/dashboard"><div className="flex aspect-square size-9 items-center justify-center rounded-xl bg-gradient-to-br from-blue-700 to-blue-500 text-white shadow-sm shadow-blue-500/30"><CommandIcon className="size-4"/></div><div className="grid flex-1 text-left leading-tight"><span className="truncate text-sm font-extrabold tracking-wide text-slate-950">GO USA <span className="text-blue-700">NEXUS</span></span><span className="truncate text-[10px] font-semibold uppercase tracking-[0.16em] text-slate-500">Inteligencia operativa</span></div></a></SidebarMenuButton></SidebarMenuItem></SidebarMenu></SidebarHeader>
   <SidebarContent className="bg-gradient-to-b from-white via-white to-slate-50/80"><NavMain items={navItems}/></SidebarContent>
