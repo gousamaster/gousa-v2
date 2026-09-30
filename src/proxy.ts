@@ -30,6 +30,7 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/dashboard-comercial/:path*",
+    "/activacion/:path*",
     "/nexus-score/:path*",
     "/prospectos/:path*",
     "/clients/:path*",
