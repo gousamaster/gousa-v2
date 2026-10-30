@@ -58,6 +58,7 @@ export default async function FeriasPage({searchParams}:{searchParams:Promise<{c
  const admin=["SUPER_ADMIN","MANAGER"].includes(u.role);
  return <section className="space-y-6 p-1">
   <div className="rounded-2xl border border-blue-100 bg-gradient-to-r from-blue-800 to-blue-600 p-6 text-white"><p className="text-xs font-bold uppercase tracking-widest text-blue-100">GO USA · FIPAZ 2026</p><h1 className="mt-2 text-3xl font-extrabold">FERIAS · Reservas</h1><p className="mt-2 text-sm text-blue-100">Precios actuales de NEXUS · QR impreso de feria · Recibos correlativos tras verificación.</p></div>
+  <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-blue-200 bg-blue-50 p-5"><div><h2 className="text-lg font-bold text-blue-950">Captación de prospectos · FIPAZ</h2><p className="mt-1 text-sm text-blue-800">Registra visitantes aunque no hagan una reserva. Se guardarán en Prospectos con origen Campaña y detalle FIPAZ 2026.</p></div><Link href="/prospectos?feria=FIPAZ2026" className="rounded-xl bg-blue-700 px-5 py-3 text-sm font-bold text-white">+ Registrar prospecto de feria</Link></div>
   {params.error&&<p className="rounded-lg bg-red-50 p-3 text-sm text-red-700">No se pudo completar la operación ({params.error}). Revisa los datos y permisos.</p>}
   {params.creado&&<p className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">Reserva registrada. Queda pendiente la confirmación del pago.</p>}
   <form action={registrar} className="grid gap-4 rounded-2xl border bg-white p-5 shadow-sm md:grid-cols-2">
