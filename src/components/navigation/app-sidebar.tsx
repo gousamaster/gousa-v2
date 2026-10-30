@@ -1,6 +1,6 @@
 "use client";
 
-import { AppWindowIcon, BarChart3Icon, CalendarIcon, CommandIcon, GaugeIcon, NotebookIcon, SettingsIcon, UserPlusIcon, UsersIcon, PlaneIcon, Building2Icon, ContactRoundIcon } from "lucide-react";
+import { AppWindowIcon, BarChart3Icon, CalendarIcon, CommandIcon, GaugeIcon, NotebookIcon, SettingsIcon, UserPlusIcon, UsersIcon, PlaneIcon, Building2Icon, ContactRoundIcon, TicketCheckIcon } from "lucide-react";
 import type * as React from "react";
 import { NavMain } from "@/components/navigation/nav-main";
 import { NavUser } from "@/components/navigation/nav-user";
@@ -12,6 +12,7 @@ const data={navMain:[
  {title:"Dashboard Comercial",url:"/dashboard-comercial",icon:BarChart3Icon},
  {title:"NEXUS Score 2.0",url:"/nexus-score",icon:GaugeIcon},
  {title:"Contactos de Campo",url:"/activacion",icon:ContactRoundIcon},
+ {title:"FERIAS",url:"/ferias",icon:TicketCheckIcon},
  {title:"Prospectos",url:"/prospectos",icon:UserPlusIcon},
  {title:"Clientes",url:"/clients",icon:UsersIcon},
  {title:"Trámites",url:"/tramites",icon:NotebookIcon},
@@ -24,7 +25,7 @@ const data={navMain:[
 
 export function AppSidebar({role,...props}:React.ComponentProps<typeof Sidebar>&{role?:string|null}){
  const navItems=isActivacionVentas(role)
-  ? data.navMain.filter((item)=>["/activacion","/prospectos","/servicios"].includes(item.url))
+  ? data.navMain.filter((item)=>["/activacion","/prospectos","/servicios","/ferias"].includes(item.url))
   : role==="SUPER_ADMIN" || role==="MANAGER"
     ? data.navMain
     : data.navMain.filter((item)=>item.url!=="/activacion");
