@@ -39,6 +39,7 @@ export const config = {
     "/visa-china/:path*",
     "/citas/:path*",
     "/servicios/:path*",
+    "/ferias/:path*",
     "/administration/:path*",
     "/settings/:path*",
     "/whatsapp-onboarding/:path*",
