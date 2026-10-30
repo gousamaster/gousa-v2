@@ -1,0 +1,2 @@
+"use client";
+export function ImprimirRecibo(){return <button type="button" onClick={()=>window.print()} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-bold text-white">Imprimir / Guardar PDF</button>}
