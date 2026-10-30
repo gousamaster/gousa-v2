@@ -4,6 +4,7 @@ export const ACTIVACION_VENTAS_ALLOWED_PREFIXES = [
   "/activacion",
   "/prospectos",
   "/servicios",
+  "/ferias",
 ] as const;
 
 export function isActivacionVentas(role?: string | null): boolean {
